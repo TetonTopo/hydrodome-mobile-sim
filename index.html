@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HydroDome Mobile — Deployment Simulator (Quesnel)</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;600;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { height:100%; background:#0d1117; font-family:'Inter',sans-serif; color:#e6edf3; overflow:hidden; }
+  #map { position:absolute; inset:0; background:#0d1117; }
+  .mono { font-family:'JetBrains Mono',monospace; }
+
+  .title { position:absolute; top:14px; left:60px; z-index:1000; background:#0d1117dd;
+    border-left:4px solid #db6d28; border-radius:4px; padding:10px 18px; pointer-events:none; }
+  .title .brand { font-family:'JetBrains Mono',monospace; font-weight:700; letter-spacing:3px; color:#39d2c0; font-size:18px; }
+  .title .brand span { color:#db6d28; }
+  .title .sub { font-size:11px; color:#7d8590; letter-spacing:1px; margin-top:3px; }
+
+  .panel { position:absolute; top:14px; right:14px; z-index:1000; width:270px;
+    background:#161b22ee; border:1px solid #30363d; border-radius:8px; padding:14px; }
+  .panel h3 { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:2px; text-transform:uppercase;
+    color:#7d8590; border-bottom:1px solid #30363d; padding-bottom:6px; margin-bottom:9px; }
+  .row { display:flex; justify-content:space-between; align-items:center; margin:6px 0; font-size:12px; }
+  .row .k { color:#7d8590; font-family:'JetBrains Mono',monospace; font-size:10px; }
+  .row .v { font-family:'JetBrains Mono',monospace; font-weight:600; }
+  .big { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:6px; }
+  .stat { background:#1c2128; border:1px solid #30363d; border-radius:6px; padding:8px; text-align:center; }
+  .stat .l { font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:1px; color:#7d8590; text-transform:uppercase; }
+  .stat .n { font-family:'JetBrains Mono',monospace; font-size:19px; font-weight:700; }
+  .legend { position:absolute; bottom:24px; left:14px; z-index:1000; background:#0d1117dd; border:1px solid #30363d;
+    border-radius:6px; padding:10px 14px; font-size:11px; line-height:1.7; }
+  .legend .sw { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+  .badge { font-size:8px; background:rgba(188,140,255,0.15); color:#bc8cff; padding:1px 6px; border-radius:7px; letter-spacing:1px; }
+  .foot { position:absolute; bottom:4px; right:12px; z-index:1000; font-family:'JetBrains Mono',monospace;
+    font-size:10px; color:rgba(57,210,192,0.4); letter-spacing:2px; }
+  .leaflet-popup-content-wrapper { background:#161b22f2; color:#e6edf3; border:1px solid #db6d28; border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:11px; }
+  .leaflet-popup-tip { background:#161b22f2; }
+  .gun-tag { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; color:#fff;
+    text-shadow:1px 1px 3px #000,-1px -1px 3px #000; white-space:nowrap; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="title">
+  <div class="brand">HYDRO<span>DOME</span> · MOBILE SIM</div>
+  <div class="sub">Trailer deployment — West Fraser Quesnel sawmill · v0 starter</div>
+</div>
+
+<div class="panel">
+  <h3>Deployment</h3>
+  <div class="big">
+    <div class="stat"><div class="l">Guns</div><div class="n" style="color:#39d2c0">8</div></div>
+    <div class="stat"><div class="l">Firing now</div><div class="n" style="color:#f85149" id="sFiring">2</div></div>
+  </div>
+  <div class="row"><span class="k">Config</span><span class="v">Concept 3/4 · 2 sides</span></div>
+  <div class="row"><span class="k">Side A active</span><span class="v" style="color:#f85149" id="sA">A3</span></div>
+  <div class="row"><span class="k">Side B active</span><span class="v" style="color:#f85149" id="sB">B2</span></div>
+  <div class="row"><span class="k">Next advance</span><span class="v" style="color:#39d2c0" id="sT">3.5s</span></div>
+  <h3 style="margin-top:12px">Hydraulics</h3>
+  <div class="row"><span class="k">Nozzle pressure</span><span class="v" style="color:#39d2c0"><span id="sPsi">70</span> PSI · SP 70</span></div>
+  <div class="row"><span class="k">Active flow</span><span class="v" style="color:#f85149"><span id="sFlow">400</span> GPM</span></div>
+  <div class="row"><span class="k">Pumps</span><span class="v" style="color:#3fb950">P1 lead · P2 armed</span></div>
+  <div class="row"><span class="k">Trailer tank</span><span class="v"><span id="sTank">64</span>% · 6,000 gal</span></div>
+  <div class="row"><span class="k">Site grade</span><span class="v" style="color:#d29922">~10% · lift 6.1 m</span></div>
+  <h3 style="margin-top:12px">Smart water <span class="badge">FUTURE</span></h3>
+  <div class="row"><span class="k">WX → fire-wx index</span><span class="v" style="color:#7d8590">not modulating</span></div>
+</div>
+
+<div class="legend">
+  <div><span class="sw" style="background:#f85149"></span>Gun firing (sequential, 1/side)</div>
+  <div><span class="sw" style="background:#3fb950"></span>Gun staged / idle</div>
+  <div><span class="sw" style="background:rgba(219,109,40,0.35);border:1px solid #db6d28"></span>Active wetted footprint (~70 m)</div>
+</div>
+<div class="foot">HYDRODOME™ MOBILE · CARMANAH WILDFIRE</div>
+
+<script>
+(function(){
+  var SITE=[52.9974,-122.5017];           // West Fraser Quesnel sawmill
+  var map=L.map('map',{center:SITE,zoom:15,zoomControl:true,attributionControl:false});
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+
+  var trailer=[52.9979,-122.5028];
+
+  // 8 guns placed irregularly per-site (NOT a grid) with per-gun standoff.
+  // side A = north/east arc, side B = south/west arc.
+  var guns=[
+    {id:'A1',ll:[52.99980,-122.50520],side:'A',standoff:35},
+    {id:'A2',ll:[53.00010,-122.50130],side:'A',standoff:40},
+    {id:'A3',ll:[52.99880,-122.49780],side:'A',standoff:30},
+    {id:'A4',ll:[52.99700,-122.49680],side:'A',standoff:45},
+    {id:'B1',ll:[52.99520,-122.49900],side:'B',standoff:38},
+    {id:'B2',ll:[52.99470,-122.50260],side:'B',standoff:32},
+    {id:'B3',ll:[52.99560,-122.50580],side:'B',standoff:42},
+    {id:'B4',ll:[52.99770,-122.50640],side:'B',standoff:36}
+  ];
+
+  // trailer marker
+  L.marker(trailer,{icon:L.divIcon({className:'',html:'<div style="background:#39d2c0;border:2px solid #fff;border-radius:3px;width:16px;height:11px"></div>',iconSize:[16,11],iconAnchor:[8,5]})})
+    .addTo(map).bindPopup('<b style="color:#39d2c0">MOBILE TRAILER</b><br>2 pumps (P1 lead / P2 standby)<br>6,000 gal tank · LoRa GW 915 MHz');
+  L.marker(trailer,{icon:L.divIcon({className:'',html:'<div class="gun-tag" style="color:#39d2c0">▣ TRAILER</div>',iconSize:[80,14],iconAnchor:[-10,6]})}).addTo(map);
+
+  // trunk lines: trailer -> each side's guns in order (4" trunk, 3" drops abstracted)
+  ['A','B'].forEach(function(s){
+    var pts=[trailer].concat(guns.filter(function(g){return g.side===s;}).map(function(g){return g.ll;}));
+    L.polyline(pts,{color:'#2ea043',weight:3,opacity:0.55,dashArray:'1 0'}).addTo(map);
+  });
+
+  // gun markers + coverage circles
+  guns.forEach(function(g){
+    g.cov=L.circle(g.ll,{radius:70,color:'#db6d28',weight:1,opacity:0.4,fillColor:'#db6d28',fillOpacity:0.06}).addTo(map);
+    g.dot=L.circleMarker(g.ll,{radius:6,color:'#fff',weight:1.5,fillColor:'#3fb950',fillOpacity:0.95}).addTo(map);
+    g.dot.bindPopup('<b style="color:#db6d28">GUN '+g.id+'</b> · Side '+g.side+
+      '<br>6 m tower · standoff '+g.standoff+' m<br>~200 GPM @ 70 PSI · LoRa node<br>valve + battery (wireless)');
+    L.marker(g.ll,{icon:L.divIcon({className:'',html:'<div class="gun-tag">'+g.id+'</div>',iconSize:[28,14],iconAnchor:[-8,7]})}).addTo(map);
+  });
+
+  var aGuns=guns.filter(function(g){return g.side==='A';});
+  var bGuns=guns.filter(function(g){return g.side==='B';});
+  var ai=2,bi=1, seqMs=3500, last=Date.now(), tank=64;
+
+  function render(){
+    guns.forEach(function(g){ var fire=(g===aGuns[ai]||g===bGuns[bi]);
+      g.dot.setStyle({fillColor:fire?'#f85149':'#3fb950',radius:fire?8:6});
+      g.cov.setStyle({opacity:fire?0.9:0.25,fillOpacity:fire?0.22:0.05,
+        color:fire?'#f85149':'#db6d28',fillColor:fire?'#f85149':'#db6d28',weight:fire?2:1});
+    });
+    document.getElementById('sA').textContent=aGuns[ai].id;
+    document.getElementById('sB').textContent=bGuns[bi].id;
+  }
+  function tick(){
+    var now=Date.now();
+    document.getElementById('sT').textContent=Math.max(0,(seqMs-(now-last))/1000).toFixed(1)+'s';
+    if(now-last>=seqMs){ last=now; ai=(ai+1)%4; bi=(bi+1)%4; render(); }
+    var psi=70+Math.sin(now/900)*1.4;
+    document.getElementById('sPsi').textContent=psi.toFixed(0);
+    document.getElementById('sFlow').textContent=Math.round(380+Math.sin(now/1100)*40);
+    tank=Math.max(8,tank-0.0008); document.getElementById('sTank').textContent=tank.toFixed(0);
+    requestAnimationFrame(tick);
+  }
+  render(); requestAnimationFrame(tick);
+
+  var b=L.latLngBounds(guns.map(function(g){return g.ll;})); b.extend(trailer);
+  map.fitBounds(b,{padding:[70,70]});
+})();
+</script>
+</body>
+</html>
