@@ -305,6 +305,12 @@
   });
   document.getElementById('igniteBtn').onclick=ignite;
   document.getElementById('resetBtn').onclick=resetFire;
+
+  // ?auto=1 -> self-playing loop (used by the deck embed): ignite, hold the line, reset, repeat
+  if(new URLSearchParams(location.search).has('auto')){
+    var loop=function(){ ignite(); var w=setInterval(function(){ if(!fireOn){ clearInterval(w); setTimeout(loop,6000); } },500); };
+    setTimeout(loop,2600);
+  }
 })();
 </script>
 </body>
