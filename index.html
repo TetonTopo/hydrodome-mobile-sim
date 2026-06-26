@@ -53,7 +53,7 @@
 
 <div class="title">
   <div class="brand">HYDRO<span>DOME</span> · MOBILE SIM</div>
-  <div class="sub">Trailer line-defense — Penticton, BC (dense WUI grid)</div>
+  <div class="sub">Forest-edge line defense — wildland-urban interface, Penticton BC</div>
 </div>
 
 <div class="panel">
@@ -67,14 +67,15 @@
     <div class="stat"><div class="l">Lost</div><div class="n crit" id="sLost">0</div></div>
   </div>
 
-  <h3>Firing Sequencer · 1 / side</h3>
-  <div class="row"><span class="k">Side A active</span><span class="v crit" id="sA">A3</span></div>
-  <div class="row"><span class="k">Side B active</span><span class="v crit" id="sB">B2</span></div>
-  <div class="row"><span class="k">Wet line</span><span class="v ok">HELD · 8-gun corridor</span></div>
+  <h3>Firing Sequencer · 4 / trailer</h3>
+  <div class="row"><span class="k">T1 firing</span><span class="v crit" id="sA">A1 A3 A5 A7</span></div>
+  <div class="row"><span class="k">T2 firing</span><span class="v crit" id="sB">B1 B3 B5 B7</span></div>
+  <div class="row"><span class="k">Wet line</span><span class="v ok">HELD · 16-node frontage</span></div>
 
-  <h3>Hose Lay · spec check</h3>
-  <div class="row"><span class="k">Trunk / side</span><span class="v">4″ · ≤300 m run</span></div>
-  <div class="row"><span class="k">Spacing</span><span class="v">30 / 80 / 80 / 80 m</span></div>
+  <h3>Deployment · 2 trailers</h3>
+  <div class="row"><span class="k">Sprinklers</span><span class="v">16 total · 8 / trailer</span></div>
+  <div class="row"><span class="k">Firing now</span><span class="v crit">8 active · 4 / trailer</span></div>
+  <div class="row"><span class="k">Frontage / run</span><span class="v">4″ · ≤300 m</span></div>
   <div class="row"><span class="k">Longest run</span><span class="v" id="sRun">295 m</span> <span class="v ok" id="sSpec">✓ in spec</span></div>
 
   <h3>Hydraulics &amp; Fire</h3>
@@ -91,8 +92,9 @@
 </div>
 
 <div class="legend">
+  <div><span class="sw" style="background:rgba(16,40,24,.85)"></span>Forest / wildland fuel&nbsp; <span class="sw" style="background:rgba(150,138,92,.4)"></span>Defensible buffer</div>
   <div><span class="sw" style="background:rgba(57,210,192,.35);border:1px solid #39d2c0"></span>Structure under HydroDome cover</div>
-  <div><span class="sw" style="background:rgba(88,166,255,.45)"></span>Wetted defensive corridor (~55 m)</div>
+  <div><span class="sw" style="background:rgba(88,166,255,.45)"></span>Wetted frontage / wet line (~55 m)</div>
   <div><span class="sw" style="background:#f85149"></span>Active fire front &nbsp;<span class="sw" style="background:#3a2218"></span>Burned</div>
 </div>
 <div class="foot">HYDRODOME™ MOBILE · CARMANAH WILDFIRE</div>
@@ -139,41 +141,51 @@
     return best||fb;
   }
 
-  // ---------- deployment (hose-lay spec enforced) ----------
-  var SPEC={ first:30, between:80, maxRun:300, drop:30, cover:55 };
-  var trailer=[49.4871,-119.5892];   // corridor on the south (wildland-facing) edge — town sits behind the wet line
-  var guns=[]; // {id, side, ll, run}
-  function placeSide(side, sign){
-    for(var k=0;k<4;k++){
-      var run=SPEC.first + SPEC.between*k;          // 30,110,190,270 along trunk
-      if(run>SPEC.maxRun) continue;                  // never beyond hose spec
-      var along=offM(trailer, sign*run, 0);          // trunk runs E (A) / W (B)
-      var gunLL=offM(along, 0, 18);                  // ~drop/standoff into the block (north)
-      gunLL=findStreet(gunLL);                        // snap onto the nearest street/open gap
-      guns.push({id:side+(k+1), side:side, ll:gunLL, run:run+18});
-    }
+  // ---------- deployment (two trailers · forest-edge frontage) ----------
+  var SPEC={ maxRun:300, cover:55 };
+  var FRONT_LAT=49.48670;                         // the wildland-urban interface line (forest edge) — town to the north, wildland to the south
+  var FRONT=[FRONT_LAT,-119.5892];
+  // two trailers, spaced along the frontage for a coordinated, community-scale defense
+  var trailers=[
+    {id:'T1', side:'A', ll:offM(FRONT,-190,-8)},  // west trailer, just inside the defensible line
+    {id:'T2', side:'B', ll:offM(FRONT, 190,-8)}   // east trailer
+  ];
+  // 16 sprinklers total — 8 per trailer — laid as a continuous interface frontage.
+  // Each trailer feeds its own half of the line; alternating banks (4 of 8) fire at a time.
+  var guns=[]; // {id, trailer, side, ll, run, bank}
+  var NSPR=16, SPAN=690, X0=-SPAN/2, STEP=SPAN/NSPR;   // ~43 m spacing across the frontage
+  for(var i=0;i<NSPR;i++){
+    var E=X0+STEP*(i+0.5);                         // -323 .. +323 m
+    var ti=i<8?0:1;                                // first 8 -> west trailer, next 8 -> east
+    var t=trailers[ti];
+    var spec=offM(FRONT,E,6);                       // a touch north of the line, throwing south into the wildland
+    var gunLL=findStreet(spec);                     // snap to open ground / street if near a footprint
+    var run=Math.abs(E-(ti?190:-190))+8;            // hose run from the owning trailer
+    guns.push({id:t.side+((i%8)+1), trailer:ti, side:t.side, ll:gunLL, bank:(i%2), run:run});
   }
-  placeSide('A',1); placeSide('B',-1);
   var longestRun=Math.max.apply(null,guns.map(function(g){return g.run;}));
   document.getElementById('sRun').textContent=Math.round(longestRun)+' m';
-  var inSpec=longestRun<=SPEC.maxRun+SPEC.drop+5;
+  var inSpec=longestRun<=SPEC.maxRun;
   document.getElementById('sSpec').textContent=inSpec?'✓ in spec':'✗ OVER SPEC';
   document.getElementById('sSpec').className='v '+(inSpec?'ok':'crit');
 
-  // line latitude of the defensive corridor (the trunk)
-  var LINE_LAT=trailer[0];
+  // latitude of the defensive frontage (separates the protected town from the wildland)
+  var LINE_LAT=FRONT_LAT;
 
   // ---------- markers ----------
-  L.marker(trailer,{icon:L.divIcon({className:'',html:'<div style="background:#39d2c0;border:2px solid #fff;border-radius:3px;width:18px;height:12px"></div>',iconSize:[18,12],iconAnchor:[9,6]})})
-    .addTo(map).bindPopup('<b style="color:#39d2c0">MOBILE TRAILER</b><br>2 pumps (P1 lead / P2 standby)<br>6,000 gal tank · LoRa GW 915 MHz');
-  L.marker(trailer,{icon:L.divIcon({className:'',html:'<div class="gun-tag" style="color:#39d2c0">▣ TRAILER</div>',iconSize:[80,14],iconAnchor:[-12,7]})}).addTo(map);
-  ['A','B'].forEach(function(s){
-    var pts=[trailer].concat(guns.filter(function(g){return g.side===s;}).map(function(g){return g.ll;}));
+  trailers.forEach(function(t){
+    L.marker(t.ll,{icon:L.divIcon({className:'',html:'<div style="background:#39d2c0;border:2px solid #fff;border-radius:3px;width:18px;height:12px"></div>',iconSize:[18,12],iconAnchor:[9,6]})})
+      .addTo(map).bindPopup('<b style="color:#39d2c0">MOBILE TRAILER '+t.id+'</b><br>2 pumps (P1 lead / P2 standby)<br>8 sprinklers · 4 firing at a time<br>6,000 gal tank · LoRa GW 915 MHz');
+    L.marker(t.ll,{icon:L.divIcon({className:'',html:'<div class="gun-tag" style="color:#39d2c0">▣ '+t.id+'</div>',iconSize:[80,14],iconAnchor:[-12,7]})}).addTo(map);
+  });
+  // trunk line: each trailer along its half of the sprinkler frontage
+  trailers.forEach(function(t,ti){
+    var pts=[t.ll].concat(guns.filter(function(g){return g.trailer===ti;}).map(function(g){return g.ll;}));
     L.polyline(pts,{color:'#2ea043',weight:3,opacity:0.6}).addTo(map);
   });
   guns.forEach(function(g){
     g.dot=L.circleMarker(g.ll,{radius:6,color:'#fff',weight:1.5,fillColor:'#3fb950',fillOpacity:0.95,pane:'markerPane'}).addTo(map);
-    g.dot.bindPopup('<b style="color:#db6d28">GUN '+g.id+'</b> · Side '+g.side+
+    g.dot.bindPopup('<b style="color:#db6d28">SPRINKLER '+g.id+'</b> · '+trailers[g.trailer].id+
       '<br>6 m tower · ~55 m throw · hose run '+Math.round(g.run)+' m<br>~200 GPM @ 70 PSI · LoRa node (valve+batt)');
     L.marker(g.ll,{icon:L.divIcon({className:'',html:'<div class="gun-tag">'+g.id+'</div>',iconSize:[26,14],iconAnchor:[-7,7]})}).addTo(map);
   });
@@ -188,15 +200,27 @@
 
   // ---------- fire grid ----------
   var CELL=7; // metres
-  var halfW=360, south=200, north=170;
+  var halfW=380, south=200, north=150;
   var cols=Math.ceil((halfW*2)/CELL), rows=Math.ceil((south+north)/CELL);
-  var originLL=offM(trailer,-halfW,-south); // SW corner
+  var originLL=offM(FRONT,-halfW,-south); // SW corner — grid runs from deep wildland (south) to town (north)
   function cellLL(r,c){ return offM(originLL, c*CELL+CELL/2, r*CELL+CELL/2); }
-  // wetted mask: within cover of ANY gun => barrier the fire cannot cross
+  // wetted mask: within cover of ANY sprinkler => the held frontage the fire cannot cross
   var wet=new Uint8Array(rows*cols), state=new Uint8Array(rows*cols), life=new Uint8Array(rows*cols);
   for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
     var ll=cellLL(r,c);
     for(var i=0;i<guns.length;i++){ if(metersBetween(guns[i].ll,ll)<=SPEC.cover){ wet[r*cols+c]=1; break; } }
+  }
+
+  // ---------- forest / wildland canopy (south of the frontage) ----------
+  // a ragged tree line begins south of the wet line, then dense canopy runs down to the grid's south edge
+  var FOREST_TOP=-34;                              // m N of the frontage where the canopy begins (south of the wet line)
+  var fEdge=new Float32Array(cols);
+  for(var fc=0;fc<cols;fc++){ fEdge[fc]=FOREST_TOP - 18*(Math.sin(fc*0.5)*0.5+0.5) - 10*Math.random(); }
+  var trees=[];
+  for(var tt=0;tt<1200;tt++){
+    var tE=(Math.random()*2-1)*(halfW-6);
+    var tN=-36-Math.random()*(south-30);           // from just below the edge down into the wildland
+    trees.push({E:tE,N:tN,r:2.0+Math.random()*2.6,g:66+((Math.random()*58)|0)});
   }
   var burning=[], lost=0, fireOn=false, ignited=false, steps=0, frontMax=0, stall=0, colBias=null;
 
@@ -292,6 +316,27 @@
   function draw(){
     ctx.clearRect(0,0,cv.width,cv.height);
     var cpx=Math.max(2, P(cellLL(0,1)).x - P(cellLL(0,0)).x + 1);
+    // ---- forest / wildland fuel + interface buffer (under everything) ----
+    var WF=function(E,N){ return P(offM(FRONT,E,N)); };
+    var fstep=2*halfW/cols;
+    // cleared defensible buffer strip: frontage (wet line) down to the ragged canopy edge
+    ctx.beginPath();
+    var pbA=WF(-halfW,10); ctx.moveTo(pbA.x,pbA.y);
+    var pbB=WF(halfW,10);  ctx.lineTo(pbB.x,pbB.y);
+    for(var fb=cols-1;fb>=0;fb--){ var pe=WF(-halfW+fb*fstep,fEdge[fb]); ctx.lineTo(pe.x,pe.y); }
+    ctx.closePath(); ctx.fillStyle='rgba(150,138,92,0.13)'; ctx.fill();
+    // forest canopy base fill: ragged top edge -> south edge of the grid
+    ctx.beginPath();
+    for(var fc2=0;fc2<cols;fc2++){ var pf=WF(-halfW+fc2*fstep,fEdge[fc2]); if(fc2===0)ctx.moveTo(pf.x,pf.y); else ctx.lineTo(pf.x,pf.y); }
+    var pbr=WF(halfW,-south-30), pbl=WF(-halfW,-south-30);
+    ctx.lineTo(pbr.x,pbr.y); ctx.lineTo(pbl.x,pbl.y); ctx.closePath();
+    ctx.fillStyle='rgba(16,40,24,0.62)'; ctx.fill();
+    // tree canopy stipple (drawn before burned/fire layers, which paint over the scorched zone)
+    var trad=Math.max(1.5,cpx*0.42);
+    for(var ti2=0;ti2<trees.length;ti2++){ var T=trees[ti2]; var tp=WF(T.E,T.N);
+      if(tp.x<-20||tp.x>cv.width+20||tp.y<-20||tp.y>cv.height+20) continue;
+      ctx.beginPath(); ctx.arc(tp.x,tp.y,trad,0,7);
+      ctx.fillStyle='rgba('+((T.g*0.34)|0)+','+T.g+','+((T.g*0.5)|0)+',0.6)'; ctx.fill(); }
     // burned area
     ctx.globalAlpha=1;
     for(var i=0;i<state.length;i++){ if(state[i]===2){ var p=P(cellLL((i/cols)|0,i%cols)); ctx.fillStyle='rgba(40,26,18,0.82)'; ctx.fillRect(p.x-cpx/2,p.y-cpx/2,cpx,cpx); } }
@@ -310,7 +355,7 @@
     // active gun coverage rings (sequential highlight) + all guns — bolder for legibility
     guns.forEach(function(g,gi){
       var p=P(g.ll); var rPx=(P(offM(g.ll,SPEC.cover,0)).x - p.x);
-      var act=(g===aGuns[ai]||g===bGuns[bi]);
+      var act=(g.bank===activeBank);
       ctx.beginPath(); ctx.arc(p.x,p.y,Math.abs(rPx),0,7);
       ctx.fillStyle=act?'rgba(248,81,73,0.22)':'rgba(219,109,40,0.12)';
       ctx.strokeStyle=act?'rgba(255,90,80,1)':'rgba(245,150,60,0.85)'; ctx.lineWidth=act?2.5:1.6; ctx.fill(); ctx.stroke();
@@ -323,13 +368,16 @@
   }
 
   // ---------- sequencer + loops ----------
-  var aGuns=guns.filter(function(g){return g.side==='A';});
-  var bGuns=guns.filter(function(g){return g.side==='B';});
-  var ai=2,bi=1, seqMs=3000, last=Date.now(), tank=64;
+  // 8 sprinklers/trailer split into two interleaved banks of 4; the active bank toggles so
+  // exactly 4 of each trailer's 8 fire at a time (8 active across the whole frontage).
+  var seqMs=3000, last=Date.now(), tank=64, activeBank=0;
+  function firingIds(ti){ return guns.filter(function(g){return g.trailer===ti && g.bank===activeBank;}).map(function(g){return g.id;}).join(' '); }
+  document.getElementById('sA').textContent=firingIds(0);
+  document.getElementById('sB').textContent=firingIds(1);
   function tickUI(){
     var now=Date.now();
-    if(now-last>=seqMs){ last=now; ai=(ai+1)%aGuns.length; bi=(bi+1)%bGuns.length;
-      document.getElementById('sA').textContent=aGuns[ai].id; document.getElementById('sB').textContent=bGuns[bi].id; }
+    if(now-last>=seqMs){ last=now; activeBank^=1;
+      document.getElementById('sA').textContent=firingIds(0); document.getElementById('sB').textContent=firingIds(1); }
     document.getElementById('sPsi').textContent=(70+Math.sin(now/900)*1.4).toFixed(0);
     document.getElementById('sFlow').textContent=Math.round(380+Math.sin(now/1100)*40);
     if(fireOn) tank=Math.max(8,tank-0.02);
@@ -341,7 +389,7 @@
   function frame(t){ if(t-lastDraw>40){ draw(); lastDraw=t; } requestAnimationFrame(frame); }
 
   map.whenReady(function(){
-    var b=L.latLngBounds([ offM(trailer,-halfW+40,-south+30), offM(trailer,halfW-40,470) ]);
+    var b=L.latLngBounds([ offM(FRONT,-halfW+30,-south+10), offM(FRONT,halfW-30,430) ]);
     map.fitBounds(b,{padding:[30,30]});
     updCounts(); requestAnimationFrame(frame);
   });

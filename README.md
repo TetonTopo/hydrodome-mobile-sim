@@ -15,11 +15,15 @@ A browser-based deployment/coverage simulator for the HydroDome **mobile
 
 Mapped on the pilot site (West Fraser Quesnel sawmill, 52.9974°N / -122.5017°W):
 
-- **One trailer** + **8 gun nodes placed irregularly per-site** (not an even
-  grid), each with its own **standoff** and a 6 m tower / ~70 m wetted footprint.
-- **Two sides (A / B)** each fed by a **4″ trunk** from the trailer.
-- **Sequential firing** — only **one gun per side** is wet at a time (≤2
-  concurrent); the active footprint cycles round-robin on a dwell timer.
+- A **forest-edge deployment** at the wildland-urban interface: the fire
+  originates in the forest to the south, the system holds the tree line, and the
+  town to the north is defended proactively (not a town being overrun).
+- **Two trailers** laid along the interface frontage, together feeding **16
+  sprinkler nodes** (8 per trailer) across a wide community-scale wet line —
+  each a 6 m tower with a ~55 m wetted footprint.
+- **Sequential firing** — each trailer runs **4 of its 8 sprinklers at a time**
+  (two interleaved banks, 8 active scene-wide); the active bank cycles on a
+  dwell timer while the full frontage stays wet.
 - Live **nozzle-pressure (~70 PSI setpoint)**, active flow, trailer-tank
   drawdown, two-pump status, and a ~10% **site-grade / static-lift** note.
 - A **smart-water (weather → fire-weather index)** placeholder — future hook,
