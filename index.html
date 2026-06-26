@@ -103,12 +103,41 @@
   var SITE=[49.4902,-119.5892];
   var map=L.map('map',{center:SITE,zoom:16,zoomControl:true,attributionControl:true,preferCanvas:true});
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    {maxZoom:19, attribution:'Imagery © Esri, Maxar · HydroDome'}).addTo(map);
+    {maxZoom:19, opacity:0.5, attribution:'Imagery © Esri, Maxar · HydroDome'}).addTo(map);
 
   // ---------- geometry helpers ----------
   var COSLAT=Math.cos(SITE[0]*Math.PI/180);
   function offM(ll, dE, dN){ return [ ll[0] + dN/111320, ll[1] + dE/(111320*COSLAT) ]; }
   function metersBetween(a,b){ var dN=(a[0]-b[0])*111320, dE=(a[1]-b[1])*111320*COSLAT; return Math.hypot(dN,dE); }
+
+  // ---------- building-avoidance (place guns on streets, not on rooftops) ----------
+  var RAW=window.BUILDINGS||[];
+  function pointInPoly(pt, ring){
+    var x=pt[1], y=pt[0], inside=false;
+    for(var i=0,j=ring.length-1;i<ring.length;j=i++){
+      var xi=ring[i][1], yi=ring[i][0], xj=ring[j][1], yj=ring[j][0];
+      if(((yi>y)!=(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi)) inside=!inside;
+    }
+    return inside;
+  }
+  // nudge a candidate point to the nearest open gap (street/yard), staying near the spec position
+  function findStreet(spec){
+    var L=RAW.filter(function(b){ return metersBetween(spec,b.c)<95; });
+    if(!L.length) return spec;
+    function inside(ll){ for(var i=0;i<L.length;i++){ if(pointInPoly(ll,L[i].r)) return true; } return false; }
+    function clr(ll){ var m=999; for(var i=0;i<L.length;i++){ var d=metersBetween(ll,L[i].c); if(d<m)m=d; } return m; }
+    var best=null, bestD=1e9, fb=spec, fbc=-1;
+    for(var dN=-8; dN<=34; dN+=2){
+      for(var dE=-24; dE<=24; dE+=2){
+        var cand=offM(spec,dE,dN);
+        if(inside(cand)) continue;            // never on a footprint
+        var c=clr(cand);
+        if(c>fbc){ fbc=c; fb=cand; }
+        if(c>=9){ var d=Math.hypot(dE,dN-12); if(d<bestD){ bestD=d; best=cand; } } // a real gap, nearest to spec
+      }
+    }
+    return best||fb;
+  }
 
   // ---------- deployment (hose-lay spec enforced) ----------
   var SPEC={ first:30, between:80, maxRun:300, drop:30, cover:55 };
@@ -120,6 +149,7 @@
       if(run>SPEC.maxRun) continue;                  // never beyond hose spec
       var along=offM(trailer, sign*run, 0);          // trunk runs E (A) / W (B)
       var gunLL=offM(along, 0, 18);                  // ~drop/standoff into the block (north)
+      gunLL=findStreet(gunLL);                        // snap onto the nearest street/open gap
       guns.push({id:side+(k+1), side:side, ll:gunLL, run:run+18});
     }
   }
@@ -168,7 +198,7 @@
     var ll=cellLL(r,c);
     for(var i=0;i<guns.length;i++){ if(metersBetween(guns[i].ll,ll)<=SPEC.cover){ wet[r*cols+c]=1; break; } }
   }
-  var burning=[], lost=0, fireOn=false, ignited=false, steps=0, frontMax=0, stall=0;
+  var burning=[], lost=0, fireOn=false, ignited=false, steps=0, frontMax=0, stall=0, colBias=null;
 
   function resetFire(){
     state.fill(0); life.fill(0); burning=[]; lost=0; steps=0; fireOn=false; ignited=false; frontMax=0; stall=0;
@@ -180,10 +210,18 @@
   }
   function ignite(){
     resetFire();
-    // ignition along south treeline (upwind), a few seed cells
-    var rr=2;
-    for(var c=Math.floor(cols*0.30);c<Math.floor(cols*0.62);c+=6){
-      var idx=rr*cols+c; if(!wet[idx]){ state[idx]=1; burning.push(idx); }
+    // persistent per-column bias => the front advances as ragged fingers, not a flat wall
+    colBias=new Float32Array(cols);
+    for(var cb=0;cb<cols;cb++) colBias[cb]=0.65+Math.random()*0.6;
+    // ignition: 3-4 random clustered seed blobs along the south treeline (upwind)
+    var nSeed=3+((Math.random()*2)|0);
+    for(var s=0;s<nSeed;s++){
+      var cc=(cols*(0.18+Math.random()*0.58))|0, rr=1+((Math.random()*3)|0), blob=4+((Math.random()*4)|0);
+      for(var k=0;k<blob;k++){
+        var oc=cc+(((Math.random()*5)|0)-2), or=rr+((Math.random()*3)|0);
+        if(or<0||oc<0||or>=rows||oc>=cols) continue;
+        var idx=or*cols+oc; if(!wet[idx]&&!state[idx]){ state[idx]=1; burning.push(idx); }
+      }
     }
     fireOn=true; ignited=true;
     document.getElementById('sFire').textContent='● ACTIVE — front advancing';
@@ -203,18 +241,22 @@
         if(!dr&&!dc) continue;
         var nr=cr+dr, nc=cc+dc; if(nr<0||nc<0||nr>=rows||nc>=cols) continue;
         var ni=nr*cols+nc; if(state[ni]||wet[ni]) continue;
-        // wind-driven: strong push north, weak lateral creep, no backing south
-        var p; if(dr>0) p=0.52-(dc!==0?0.16:0); else if(dr===0) p=0.05; else p=0;
+        // wind-driven: push north, weak lateral creep, no backing south — probabilities
+        // cut ~10x slower, then modulated by per-column bias + noise => organic, fingered front
+        var p; if(dr>0) p=0.34-(dc!==0?0.10:0); else if(dr===0) p=0.04; else p=0;
         if(dc>0) p+=0.03; // slight east drift (wind SSW)
+        p*= (colBias?colBias[nc]:1);          // persistent fingers
+        p*= 0.8+Math.random()*0.4;            // per-attempt noise => ragged edge
         if(p>0 && Math.random()<p){ state[ni]=1; next.push(ni); }
       }
-      if(life[idx]>2){ state[idx]=2; } else { next.push(idx); }
+      if(life[idx]>3){ state[idx]=2; } else { next.push(idx); }
     }
-    // embers / spot fires downwind (north), can leap short gaps but not the wet line
-    if(steps%3===0){
-      for(var e=0;e<1;e++){
+    // embers / spot fires downwind (north) — more frequent & scattered, but never cross the wet line
+    if(steps%2===0){
+      var nE=1+((Math.random()*2)|0);
+      for(var e=0;e<nE;e++){
         var src=burning[(Math.random()*burning.length)|0]; if(src==null) continue;
-        var sr=(src/cols)|0, sc=src%cols, jr=sr+3+((Math.random()*3)|0), jc=sc+((Math.random()*3-1)|0);
+        var sr=(src/cols)|0, sc=src%cols, jr=sr+2+((Math.random()*4)|0), jc=sc+(((Math.random()*5)|0)-2);
         if(jr<rows&&jc>=0&&jc<cols){ var blocked=false; for(var yy=sr;yy<=jr;yy++){ if(wet[yy*cols+jc]){blocked=true;break;} }
           var ji=jr*cols+jc; if(!blocked&&!state[ji]&&!wet[ji]){ state[ji]=1; next.push(ji); } }
       }
@@ -254,24 +296,24 @@
     ctx.globalAlpha=1;
     for(var i=0;i<state.length;i++){ if(state[i]===2){ var p=P(cellLL((i/cols)|0,i%cols)); ctx.fillStyle='rgba(40,26,18,0.82)'; ctx.fillRect(p.x-cpx/2,p.y-cpx/2,cpx,cpx); } }
     // wetted corridor
-    ctx.fillStyle='rgba(88,166,255,0.20)';
+    ctx.fillStyle='rgba(88,166,255,0.32)';
     for(var w=0;w<wet.length;w++){ if(wet[w]){ var pw=P(cellLL((w/cols)|0,w%cols)); ctx.fillRect(pw.x-cpx/2,pw.y-cpx/2,cpx,cpx); } }
-    // buildings
+    // buildings — high contrast over the dimmed satellite
     for(var k=0;k<BLD.length;k++){ var b=BLD[k], ring=b.r; if(ring.length<3) continue;
       ctx.beginPath(); for(var j=0;j<ring.length;j++){ var pp=P(ring[j]); if(j===0)ctx.moveTo(pp.x,pp.y); else ctx.lineTo(pp.x,pp.y); } ctx.closePath();
-      if(b.state==='cov'){ ctx.fillStyle='rgba(57,210,192,0.45)'; ctx.strokeStyle='#39d2c0'; }
-      else if(b.state==='lost'){ ctx.fillStyle='rgba(20,20,20,0.85)'; ctx.strokeStyle='#000'; }
-      else if(b.state==='safe'){ ctx.fillStyle='rgba(63,185,80,0.16)'; ctx.strokeStyle='rgba(63,185,80,0.5)'; }
-      else { ctx.fillStyle='rgba(210,153,34,0.18)'; ctx.strokeStyle='rgba(210,153,34,0.55)'; }
-      ctx.lineWidth=1; ctx.fill(); ctx.stroke();
+      if(b.state==='cov'){ ctx.fillStyle='rgba(57,210,192,0.60)'; ctx.strokeStyle='#5af0e0'; }
+      else if(b.state==='lost'){ ctx.fillStyle='rgba(10,10,10,0.92)'; ctx.strokeStyle='#000'; }
+      else if(b.state==='safe'){ ctx.fillStyle='rgba(63,185,80,0.40)'; ctx.strokeStyle='rgba(88,255,110,0.95)'; }
+      else { ctx.fillStyle='rgba(210,153,34,0.42)'; ctx.strokeStyle='rgba(255,190,60,0.95)'; }
+      ctx.lineWidth=1.5; ctx.fill(); ctx.stroke();
     }
-    // active gun coverage rings (sequential highlight) + all guns faint
+    // active gun coverage rings (sequential highlight) + all guns — bolder for legibility
     guns.forEach(function(g,gi){
       var p=P(g.ll); var rPx=(P(offM(g.ll,SPEC.cover,0)).x - p.x);
       var act=(g===aGuns[ai]||g===bGuns[bi]);
       ctx.beginPath(); ctx.arc(p.x,p.y,Math.abs(rPx),0,7);
-      ctx.fillStyle=act?'rgba(248,81,73,0.16)':'rgba(219,109,40,0.05)';
-      ctx.strokeStyle=act?'rgba(248,81,73,0.9)':'rgba(219,109,40,0.4)'; ctx.lineWidth=act?2:1; ctx.fill(); ctx.stroke();
+      ctx.fillStyle=act?'rgba(248,81,73,0.22)':'rgba(219,109,40,0.12)';
+      ctx.strokeStyle=act?'rgba(255,90,80,1)':'rgba(245,150,60,0.85)'; ctx.lineWidth=act?2.5:1.6; ctx.fill(); ctx.stroke();
       g.dot.setStyle({fillColor:act?'#f85149':'#3fb950',radius:act?8:6});
     });
     // burning front (bright, on top)
@@ -294,7 +336,7 @@
     document.getElementById('sTank').textContent=tank.toFixed(0);
   }
   setInterval(tickUI,250);
-  setInterval(fireStep,150);
+  setInterval(fireStep,800);   // ~10x slower burn (paired with the reduced spread probabilities)
   var lastDraw=0;
   function frame(t){ if(t-lastDraw>40){ draw(); lastDraw=t; } requestAnimationFrame(frame); }
 
