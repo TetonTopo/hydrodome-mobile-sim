@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>HydroDome Mobile — Deployment Simulator (Quesnel)</title>
+<title>HydroDome Mobile — Deployment Simulator (Penticton)</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -10,140 +10,301 @@
   * { margin:0; padding:0; box-sizing:border-box; }
   html,body { height:100%; background:#0d1117; font-family:'Inter',sans-serif; color:#e6edf3; overflow:hidden; }
   #map { position:absolute; inset:0; background:#0d1117; }
+  #fx { position:absolute; inset:0; z-index:400; pointer-events:none; }
   .mono { font-family:'JetBrains Mono',monospace; }
 
-  .title { position:absolute; top:14px; left:60px; z-index:1000; background:#0d1117dd;
+  .title { position:absolute; top:14px; left:54px; z-index:1000; background:#0d1117dd;
     border-left:4px solid #db6d28; border-radius:4px; padding:10px 18px; pointer-events:none; }
   .title .brand { font-family:'JetBrains Mono',monospace; font-weight:700; letter-spacing:3px; color:#39d2c0; font-size:18px; }
   .title .brand span { color:#db6d28; }
-  .title .sub { font-size:11px; color:#7d8590; letter-spacing:1px; margin-top:3px; }
+  .title .sub { font-size:11px; color:#c9d1d9; letter-spacing:1px; margin-top:3px; }
 
-  .panel { position:absolute; top:14px; right:14px; z-index:1000; width:270px;
-    background:#161b22ee; border:1px solid #30363d; border-radius:8px; padding:14px; }
+  .panel { position:absolute; top:14px; right:14px; z-index:1000; width:264px;
+    background:#0d1117ee; border:1px solid #30363d; border-radius:8px; padding:13px; }
   .panel h3 { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:2px; text-transform:uppercase;
-    color:#7d8590; border-bottom:1px solid #30363d; padding-bottom:6px; margin-bottom:9px; }
-  .row { display:flex; justify-content:space-between; align-items:center; margin:6px 0; font-size:12px; }
+    color:#7d8590; border-bottom:1px solid #30363d; padding-bottom:5px; margin:11px 0 8px; }
+  .panel h3:first-child { margin-top:0; }
+  .row { display:flex; justify-content:space-between; align-items:center; margin:5px 0; font-size:12px; }
   .row .k { color:#7d8590; font-family:'JetBrains Mono',monospace; font-size:10px; }
   .row .v { font-family:'JetBrains Mono',monospace; font-weight:600; }
-  .big { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:6px; }
-  .stat { background:#1c2128; border:1px solid #30363d; border-radius:6px; padding:8px; text-align:center; }
+  .big { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .stat { background:#161b22; border:1px solid #30363d; border-radius:6px; padding:8px; text-align:center; }
   .stat .l { font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:1px; color:#7d8590; text-transform:uppercase; }
-  .stat .n { font-family:'JetBrains Mono',monospace; font-size:19px; font-weight:700; }
-  .legend { position:absolute; bottom:24px; left:14px; z-index:1000; background:#0d1117dd; border:1px solid #30363d;
-    border-radius:6px; padding:10px 14px; font-size:11px; line-height:1.7; }
-  .legend .sw { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:6px; vertical-align:middle; }
-  .badge { font-size:8px; background:rgba(188,140,255,0.15); color:#bc8cff; padding:1px 6px; border-radius:7px; letter-spacing:1px; }
-  .foot { position:absolute; bottom:4px; right:12px; z-index:1000; font-family:'JetBrains Mono',monospace;
-    font-size:10px; color:rgba(57,210,192,0.4); letter-spacing:2px; }
+  .stat .n { font-family:'JetBrains Mono',monospace; font-size:20px; font-weight:700; }
+  .btn { margin-top:10px; width:100%; background:#db6d28; color:#0d1117; border:none; border-radius:6px;
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:11px; letter-spacing:1px; padding:9px; cursor:pointer; }
+  .btn.reset { background:#21262d; color:#c9d1d9; border:1px solid #30363d; margin-top:6px; }
+
+  .legend { position:absolute; bottom:22px; left:14px; z-index:1000; background:#0d1117e6; border:1px solid #30363d;
+    border-radius:6px; padding:9px 13px; font-size:10.5px; line-height:1.65; }
+  .legend .sw { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:middle; }
+  .badge { font-size:8px; background:rgba(188,140,255,0.16); color:#bc8cff; padding:1px 6px; border-radius:7px; letter-spacing:1px; }
+  .foot { position:absolute; bottom:3px; right:12px; z-index:1000; font-family:'JetBrains Mono',monospace;
+    font-size:10px; color:rgba(255,255,255,0.5); letter-spacing:2px; }
   .leaflet-popup-content-wrapper { background:#161b22f2; color:#e6edf3; border:1px solid #db6d28; border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:11px; }
   .leaflet-popup-tip { background:#161b22f2; }
-  .gun-tag { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; color:#fff;
-    text-shadow:1px 1px 3px #000,-1px -1px 3px #000; white-space:nowrap; }
+  .gun-tag { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; color:#fff; text-shadow:1px 1px 3px #000,-1px -1px 3px #000; white-space:nowrap; }
+  .ok { color:#3fb950; } .warn { color:#d29922; } .crit { color:#f85149; }
 </style>
 </head>
 <body>
 <div id="map"></div>
+<canvas id="fx"></canvas>
 
 <div class="title">
   <div class="brand">HYDRO<span>DOME</span> · MOBILE SIM</div>
-  <div class="sub">Trailer deployment — West Fraser Quesnel sawmill · v0 starter</div>
+  <div class="sub">Trailer line-defense — Penticton, BC (dense WUI grid)</div>
 </div>
 
 <div class="panel">
-  <h3>Deployment</h3>
+  <h3>Structures</h3>
   <div class="big">
-    <div class="stat"><div class="l">Guns</div><div class="n" style="color:#39d2c0">8</div></div>
-    <div class="stat"><div class="l">Firing now</div><div class="n" style="color:#f85149" id="sFiring">2</div></div>
+    <div class="stat"><div class="l">In frame</div><div class="n" style="color:#c9d1d9" id="sTot">—</div></div>
+    <div class="stat"><div class="l">Under cover</div><div class="n ok" id="sCov">—</div></div>
   </div>
-  <div class="row"><span class="k">Config</span><span class="v">Concept 3/4 · 2 sides</span></div>
-  <div class="row"><span class="k">Side A active</span><span class="v" style="color:#f85149" id="sA">A3</span></div>
-  <div class="row"><span class="k">Side B active</span><span class="v" style="color:#f85149" id="sB">B2</span></div>
-  <div class="row"><span class="k">Next advance</span><span class="v" style="color:#39d2c0" id="sT">3.5s</span></div>
-  <h3 style="margin-top:12px">Hydraulics</h3>
+  <div class="big" style="margin-top:8px">
+    <div class="stat"><div class="l">Protected</div><div class="n ok" id="sSafe">—</div></div>
+    <div class="stat"><div class="l">Lost</div><div class="n crit" id="sLost">0</div></div>
+  </div>
+
+  <h3>Firing Sequencer · 1 / side</h3>
+  <div class="row"><span class="k">Side A active</span><span class="v crit" id="sA">A3</span></div>
+  <div class="row"><span class="k">Side B active</span><span class="v crit" id="sB">B2</span></div>
+  <div class="row"><span class="k">Wet line</span><span class="v ok">HELD · 8-gun corridor</span></div>
+
+  <h3>Hose Lay · spec check</h3>
+  <div class="row"><span class="k">Trunk / side</span><span class="v">4″ · ≤300 m run</span></div>
+  <div class="row"><span class="k">Spacing</span><span class="v">30 / 80 / 80 / 80 m</span></div>
+  <div class="row"><span class="k">Longest run</span><span class="v" id="sRun">295 m</span> <span class="v ok" id="sSpec">✓ in spec</span></div>
+
+  <h3>Hydraulics &amp; Fire</h3>
   <div class="row"><span class="k">Nozzle pressure</span><span class="v" style="color:#39d2c0"><span id="sPsi">70</span> PSI · SP 70</span></div>
-  <div class="row"><span class="k">Active flow</span><span class="v" style="color:#f85149"><span id="sFlow">400</span> GPM</span></div>
-  <div class="row"><span class="k">Pumps</span><span class="v" style="color:#3fb950">P1 lead · P2 armed</span></div>
+  <div class="row"><span class="k">Active flow</span><span class="v crit"><span id="sFlow">400</span> GPM</span></div>
   <div class="row"><span class="k">Trailer tank</span><span class="v"><span id="sTank">64</span>% · 6,000 gal</span></div>
-  <div class="row"><span class="k">Site grade</span><span class="v" style="color:#d29922">~10% · lift 6.1 m</span></div>
-  <h3 style="margin-top:12px">Smart water <span class="badge">FUTURE</span></h3>
+  <div class="row"><span class="k">Wind</span><span class="v warn" id="sWind">SSW 24 km/h</span></div>
+  <div class="row"><span class="k">Fire status</span><span class="v" id="sFire">— ignition pending</span></div>
+  <h3>Smart water <span class="badge">FUTURE</span></h3>
   <div class="row"><span class="k">WX → fire-wx index</span><span class="v" style="color:#7d8590">not modulating</span></div>
+
+  <button class="btn" id="igniteBtn">▶ IGNITE / RUN FIRE</button>
+  <button class="btn reset" id="resetBtn">↺ RESET</button>
 </div>
 
 <div class="legend">
-  <div><span class="sw" style="background:#f85149"></span>Gun firing (sequential, 1/side)</div>
-  <div><span class="sw" style="background:#3fb950"></span>Gun staged / idle</div>
-  <div><span class="sw" style="background:rgba(219,109,40,0.35);border:1px solid #db6d28"></span>Active wetted footprint (~70 m)</div>
+  <div><span class="sw" style="background:rgba(57,210,192,.35);border:1px solid #39d2c0"></span>Structure under HydroDome cover</div>
+  <div><span class="sw" style="background:rgba(88,166,255,.45)"></span>Wetted defensive corridor (~55 m)</div>
+  <div><span class="sw" style="background:#f85149"></span>Active fire front &nbsp;<span class="sw" style="background:#3a2218"></span>Burned</div>
 </div>
 <div class="foot">HYDRODOME™ MOBILE · CARMANAH WILDFIRE</div>
 
+<script src="buildings.js"></script>
 <script>
 (function(){
-  var SITE=[52.9974,-122.5017];           // West Fraser Quesnel sawmill
-  var map=L.map('map',{center:SITE,zoom:15,zoomControl:true,attributionControl:false});
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+  var SITE=[49.4902,-119.5892];
+  var map=L.map('map',{center:SITE,zoom:16,zoomControl:true,attributionControl:true,preferCanvas:true});
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    {maxZoom:19, attribution:'Imagery © Esri, Maxar · HydroDome'}).addTo(map);
 
-  var trailer=[52.9979,-122.5028];
+  // ---------- geometry helpers ----------
+  var COSLAT=Math.cos(SITE[0]*Math.PI/180);
+  function offM(ll, dE, dN){ return [ ll[0] + dN/111320, ll[1] + dE/(111320*COSLAT) ]; }
+  function metersBetween(a,b){ var dN=(a[0]-b[0])*111320, dE=(a[1]-b[1])*111320*COSLAT; return Math.hypot(dN,dE); }
 
-  // 8 guns placed irregularly per-site (NOT a grid) with per-gun standoff.
-  // side A = north/east arc, side B = south/west arc.
-  var guns=[
-    {id:'A1',ll:[52.99980,-122.50520],side:'A',standoff:35},
-    {id:'A2',ll:[53.00010,-122.50130],side:'A',standoff:40},
-    {id:'A3',ll:[52.99880,-122.49780],side:'A',standoff:30},
-    {id:'A4',ll:[52.99700,-122.49680],side:'A',standoff:45},
-    {id:'B1',ll:[52.99520,-122.49900],side:'B',standoff:38},
-    {id:'B2',ll:[52.99470,-122.50260],side:'B',standoff:32},
-    {id:'B3',ll:[52.99560,-122.50580],side:'B',standoff:42},
-    {id:'B4',ll:[52.99770,-122.50640],side:'B',standoff:36}
-  ];
+  // ---------- deployment (hose-lay spec enforced) ----------
+  var SPEC={ first:30, between:80, maxRun:300, drop:30, cover:55 };
+  var trailer=[49.4871,-119.5892];   // corridor on the south (wildland-facing) edge — town sits behind the wet line
+  var guns=[]; // {id, side, ll, run}
+  function placeSide(side, sign){
+    for(var k=0;k<4;k++){
+      var run=SPEC.first + SPEC.between*k;          // 30,110,190,270 along trunk
+      if(run>SPEC.maxRun) continue;                  // never beyond hose spec
+      var along=offM(trailer, sign*run, 0);          // trunk runs E (A) / W (B)
+      var gunLL=offM(along, 0, 18);                  // ~drop/standoff into the block (north)
+      guns.push({id:side+(k+1), side:side, ll:gunLL, run:run+18});
+    }
+  }
+  placeSide('A',1); placeSide('B',-1);
+  var longestRun=Math.max.apply(null,guns.map(function(g){return g.run;}));
+  document.getElementById('sRun').textContent=Math.round(longestRun)+' m';
+  var inSpec=longestRun<=SPEC.maxRun+SPEC.drop+5;
+  document.getElementById('sSpec').textContent=inSpec?'✓ in spec':'✗ OVER SPEC';
+  document.getElementById('sSpec').className='v '+(inSpec?'ok':'crit');
 
-  // trailer marker
-  L.marker(trailer,{icon:L.divIcon({className:'',html:'<div style="background:#39d2c0;border:2px solid #fff;border-radius:3px;width:16px;height:11px"></div>',iconSize:[16,11],iconAnchor:[8,5]})})
+  // line latitude of the defensive corridor (the trunk)
+  var LINE_LAT=trailer[0];
+
+  // ---------- markers ----------
+  L.marker(trailer,{icon:L.divIcon({className:'',html:'<div style="background:#39d2c0;border:2px solid #fff;border-radius:3px;width:18px;height:12px"></div>',iconSize:[18,12],iconAnchor:[9,6]})})
     .addTo(map).bindPopup('<b style="color:#39d2c0">MOBILE TRAILER</b><br>2 pumps (P1 lead / P2 standby)<br>6,000 gal tank · LoRa GW 915 MHz');
-  L.marker(trailer,{icon:L.divIcon({className:'',html:'<div class="gun-tag" style="color:#39d2c0">▣ TRAILER</div>',iconSize:[80,14],iconAnchor:[-10,6]})}).addTo(map);
-
-  // trunk lines: trailer -> each side's guns in order (4" trunk, 3" drops abstracted)
+  L.marker(trailer,{icon:L.divIcon({className:'',html:'<div class="gun-tag" style="color:#39d2c0">▣ TRAILER</div>',iconSize:[80,14],iconAnchor:[-12,7]})}).addTo(map);
   ['A','B'].forEach(function(s){
     var pts=[trailer].concat(guns.filter(function(g){return g.side===s;}).map(function(g){return g.ll;}));
-    L.polyline(pts,{color:'#2ea043',weight:3,opacity:0.55,dashArray:'1 0'}).addTo(map);
+    L.polyline(pts,{color:'#2ea043',weight:3,opacity:0.6}).addTo(map);
   });
-
-  // gun markers + coverage circles
   guns.forEach(function(g){
-    g.cov=L.circle(g.ll,{radius:70,color:'#db6d28',weight:1,opacity:0.4,fillColor:'#db6d28',fillOpacity:0.06}).addTo(map);
-    g.dot=L.circleMarker(g.ll,{radius:6,color:'#fff',weight:1.5,fillColor:'#3fb950',fillOpacity:0.95}).addTo(map);
+    g.dot=L.circleMarker(g.ll,{radius:6,color:'#fff',weight:1.5,fillColor:'#3fb950',fillOpacity:0.95,pane:'markerPane'}).addTo(map);
     g.dot.bindPopup('<b style="color:#db6d28">GUN '+g.id+'</b> · Side '+g.side+
-      '<br>6 m tower · standoff '+g.standoff+' m<br>~200 GPM @ 70 PSI · LoRa node<br>valve + battery (wireless)');
-    L.marker(g.ll,{icon:L.divIcon({className:'',html:'<div class="gun-tag">'+g.id+'</div>',iconSize:[28,14],iconAnchor:[-8,7]})}).addTo(map);
+      '<br>6 m tower · ~55 m throw · hose run '+Math.round(g.run)+' m<br>~200 GPM @ 70 PSI · LoRa node (valve+batt)');
+    L.marker(g.ll,{icon:L.divIcon({className:'',html:'<div class="gun-tag">'+g.id+'</div>',iconSize:[26,14],iconAnchor:[-7,7]})}).addTo(map);
   });
 
+  // ---------- buildings ----------
+  var BLD=(window.BUILDINGS||[]).map(function(b){
+    var covered = guns.some(function(g){ return metersBetween(g.ll,b.c)<=SPEC.cover; });
+    var north = b.c[0] >= LINE_LAT;            // behind the wet line (protected side)
+    return { c:b.c, r:b.r, covered:covered, north:north, state: covered?'cov':(north?'safe':'risk') };
+  });
+  document.getElementById('sTot').textContent=BLD.length;
+
+  // ---------- fire grid ----------
+  var CELL=7; // metres
+  var halfW=360, south=200, north=170;
+  var cols=Math.ceil((halfW*2)/CELL), rows=Math.ceil((south+north)/CELL);
+  var originLL=offM(trailer,-halfW,-south); // SW corner
+  function cellLL(r,c){ return offM(originLL, c*CELL+CELL/2, r*CELL+CELL/2); }
+  // wetted mask: within cover of ANY gun => barrier the fire cannot cross
+  var wet=new Uint8Array(rows*cols), state=new Uint8Array(rows*cols), life=new Uint8Array(rows*cols);
+  for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
+    var ll=cellLL(r,c);
+    for(var i=0;i<guns.length;i++){ if(metersBetween(guns[i].ll,ll)<=SPEC.cover){ wet[r*cols+c]=1; break; } }
+  }
+  var burning=[], lost=0, fireOn=false, ignited=false, steps=0, frontMax=0, stall=0;
+
+  function resetFire(){
+    state.fill(0); life.fill(0); burning=[]; lost=0; steps=0; fireOn=false; ignited=false; frontMax=0; stall=0;
+    BLD.forEach(function(b){ b.state = b.covered?'cov':(b.north?'safe':'risk'); });
+    document.getElementById('sLost').textContent='0';
+    document.getElementById('sFire').textContent='— ignition pending';
+    document.getElementById('sFire').className='v';
+    updCounts();
+  }
+  function ignite(){
+    resetFire();
+    // ignition along south treeline (upwind), a few seed cells
+    var rr=2;
+    for(var c=Math.floor(cols*0.30);c<Math.floor(cols*0.62);c+=6){
+      var idx=rr*cols+c; if(!wet[idx]){ state[idx]=1; burning.push(idx); }
+    }
+    fireOn=true; ignited=true;
+    document.getElementById('sFire').textContent='● ACTIVE — front advancing';
+    document.getElementById('sFire').className='v crit';
+  }
+
+  // wind: from SSW => fire travels NNE (toward +row, slight +col)
+  function fireStep(){
+    if(!fireOn) return;
+    steps++;
+    var next=[];
+    for(var b=0;b<burning.length;b++){
+      var idx=burning[b], cr=(idx/cols)|0, cc=idx%cols;
+      life[idx]++;
+      // spread to neighbours, wind-biased
+      for(var dr=-1;dr<=1;dr++)for(var dc=-1;dc<=1;dc++){
+        if(!dr&&!dc) continue;
+        var nr=cr+dr, nc=cc+dc; if(nr<0||nc<0||nr>=rows||nc>=cols) continue;
+        var ni=nr*cols+nc; if(state[ni]||wet[ni]) continue;
+        // wind-driven: strong push north, weak lateral creep, no backing south
+        var p; if(dr>0) p=0.52-(dc!==0?0.16:0); else if(dr===0) p=0.05; else p=0;
+        if(dc>0) p+=0.03; // slight east drift (wind SSW)
+        if(p>0 && Math.random()<p){ state[ni]=1; next.push(ni); }
+      }
+      if(life[idx]>2){ state[idx]=2; } else { next.push(idx); }
+    }
+    // embers / spot fires downwind (north), can leap short gaps but not the wet line
+    if(steps%3===0){
+      for(var e=0;e<1;e++){
+        var src=burning[(Math.random()*burning.length)|0]; if(src==null) continue;
+        var sr=(src/cols)|0, sc=src%cols, jr=sr+3+((Math.random()*3)|0), jc=sc+((Math.random()*3-1)|0);
+        if(jr<rows&&jc>=0&&jc<cols){ var blocked=false; for(var yy=sr;yy<=jr;yy++){ if(wet[yy*cols+jc]){blocked=true;break;} }
+          var ji=jr*cols+jc; if(!blocked&&!state[ji]&&!wet[ji]){ state[ji]=1; next.push(ji); } }
+      }
+    }
+    burning=next;
+    // convergence: once the front stops gaining ground (held at the wet line), let remnants burn out
+    var mr=0; for(var q=0;q<burning.length;q++){ var qr=(burning[q]/cols)|0; if(qr>mr)mr=qr; }
+    if(mr>frontMax){ frontMax=mr; stall=0; } else { stall++; }
+    if(stall>20){ burning.length=0; }
+    // structure damage: any building whose centroid cell is burning/burnt and not covered
+    for(var k=0;k<BLD.length;k++){ var bl=BLD[k]; if(bl.state==='lost'||bl.state==='cov') continue;
+      var gr=Math.floor((bl.c[0]-originLL[0])*111320/CELL), gc=Math.floor((bl.c[1]-originLL[1])*111320*COSLAT/CELL);
+      if(gr>=0&&gc>=0&&gr<rows&&gc<cols){ var s=state[gr*cols+gc]; if(s){ bl.state='lost'; lost++; } }
+    }
+    if(burning.length===0){ fireOn=false;
+      document.getElementById('sFire').textContent='✓ CONTAINED at wet line';
+      document.getElementById('sFire').className='v ok';
+    }
+    document.getElementById('sLost').textContent=lost;
+    updCounts();
+  }
+  function updCounts(){
+    var cov=0,safe=0; for(var k=0;k<BLD.length;k++){ var s=BLD[k].state; if(s==='cov')cov++; else if(s==='safe')safe++; }
+    document.getElementById('sCov').textContent=cov;
+    document.getElementById('sSafe').textContent=safe+cov; // protected = behind line + covered
+  }
+
+  // ---------- canvas render ----------
+  var cv=document.getElementById('fx'), ctx=cv.getContext('2d');
+  function size(){ var s=map.getSize(); cv.width=s.x; cv.height=s.y; }
+  size(); map.on('resize',size);
+  function P(ll){ return map.latLngToContainerPoint(ll); }
+  function draw(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    var cpx=Math.max(2, P(cellLL(0,1)).x - P(cellLL(0,0)).x + 1);
+    // burned area
+    ctx.globalAlpha=1;
+    for(var i=0;i<state.length;i++){ if(state[i]===2){ var p=P(cellLL((i/cols)|0,i%cols)); ctx.fillStyle='rgba(40,26,18,0.82)'; ctx.fillRect(p.x-cpx/2,p.y-cpx/2,cpx,cpx); } }
+    // wetted corridor
+    ctx.fillStyle='rgba(88,166,255,0.20)';
+    for(var w=0;w<wet.length;w++){ if(wet[w]){ var pw=P(cellLL((w/cols)|0,w%cols)); ctx.fillRect(pw.x-cpx/2,pw.y-cpx/2,cpx,cpx); } }
+    // buildings
+    for(var k=0;k<BLD.length;k++){ var b=BLD[k], ring=b.r; if(ring.length<3) continue;
+      ctx.beginPath(); for(var j=0;j<ring.length;j++){ var pp=P(ring[j]); if(j===0)ctx.moveTo(pp.x,pp.y); else ctx.lineTo(pp.x,pp.y); } ctx.closePath();
+      if(b.state==='cov'){ ctx.fillStyle='rgba(57,210,192,0.45)'; ctx.strokeStyle='#39d2c0'; }
+      else if(b.state==='lost'){ ctx.fillStyle='rgba(20,20,20,0.85)'; ctx.strokeStyle='#000'; }
+      else if(b.state==='safe'){ ctx.fillStyle='rgba(63,185,80,0.16)'; ctx.strokeStyle='rgba(63,185,80,0.5)'; }
+      else { ctx.fillStyle='rgba(210,153,34,0.18)'; ctx.strokeStyle='rgba(210,153,34,0.55)'; }
+      ctx.lineWidth=1; ctx.fill(); ctx.stroke();
+    }
+    // active gun coverage rings (sequential highlight) + all guns faint
+    guns.forEach(function(g,gi){
+      var p=P(g.ll); var rPx=(P(offM(g.ll,SPEC.cover,0)).x - p.x);
+      var act=(g===aGuns[ai]||g===bGuns[bi]);
+      ctx.beginPath(); ctx.arc(p.x,p.y,Math.abs(rPx),0,7);
+      ctx.fillStyle=act?'rgba(248,81,73,0.16)':'rgba(219,109,40,0.05)';
+      ctx.strokeStyle=act?'rgba(248,81,73,0.9)':'rgba(219,109,40,0.4)'; ctx.lineWidth=act?2:1; ctx.fill(); ctx.stroke();
+      g.dot.setStyle({fillColor:act?'#f85149':'#3fb950',radius:act?8:6});
+    });
+    // burning front (bright, on top)
+    for(var f=0;f<state.length;f++){ if(state[f]===1){ var pf=P(cellLL((f/cols)|0,f%cols));
+      ctx.fillStyle='rgba(248,120,40,0.95)'; ctx.fillRect(pf.x-cpx/2,pf.y-cpx/2,cpx,cpx);
+      ctx.fillStyle='rgba(255,220,120,0.5)'; ctx.fillRect(pf.x-cpx/4,pf.y-cpx/4,cpx/2,cpx/2); } }
+  }
+
+  // ---------- sequencer + loops ----------
   var aGuns=guns.filter(function(g){return g.side==='A';});
   var bGuns=guns.filter(function(g){return g.side==='B';});
-  var ai=2,bi=1, seqMs=3500, last=Date.now(), tank=64;
-
-  function render(){
-    guns.forEach(function(g){ var fire=(g===aGuns[ai]||g===bGuns[bi]);
-      g.dot.setStyle({fillColor:fire?'#f85149':'#3fb950',radius:fire?8:6});
-      g.cov.setStyle({opacity:fire?0.9:0.25,fillOpacity:fire?0.22:0.05,
-        color:fire?'#f85149':'#db6d28',fillColor:fire?'#f85149':'#db6d28',weight:fire?2:1});
-    });
-    document.getElementById('sA').textContent=aGuns[ai].id;
-    document.getElementById('sB').textContent=bGuns[bi].id;
-  }
-  function tick(){
+  var ai=2,bi=1, seqMs=3000, last=Date.now(), tank=64;
+  function tickUI(){
     var now=Date.now();
-    document.getElementById('sT').textContent=Math.max(0,(seqMs-(now-last))/1000).toFixed(1)+'s';
-    if(now-last>=seqMs){ last=now; ai=(ai+1)%4; bi=(bi+1)%4; render(); }
-    var psi=70+Math.sin(now/900)*1.4;
-    document.getElementById('sPsi').textContent=psi.toFixed(0);
+    if(now-last>=seqMs){ last=now; ai=(ai+1)%aGuns.length; bi=(bi+1)%bGuns.length;
+      document.getElementById('sA').textContent=aGuns[ai].id; document.getElementById('sB').textContent=bGuns[bi].id; }
+    document.getElementById('sPsi').textContent=(70+Math.sin(now/900)*1.4).toFixed(0);
     document.getElementById('sFlow').textContent=Math.round(380+Math.sin(now/1100)*40);
-    tank=Math.max(8,tank-0.0008); document.getElementById('sTank').textContent=tank.toFixed(0);
-    requestAnimationFrame(tick);
+    if(fireOn) tank=Math.max(8,tank-0.02);
+    document.getElementById('sTank').textContent=tank.toFixed(0);
   }
-  render(); requestAnimationFrame(tick);
+  setInterval(tickUI,250);
+  setInterval(fireStep,150);
+  var lastDraw=0;
+  function frame(t){ if(t-lastDraw>40){ draw(); lastDraw=t; } requestAnimationFrame(frame); }
 
-  var b=L.latLngBounds(guns.map(function(g){return g.ll;})); b.extend(trailer);
-  map.fitBounds(b,{padding:[70,70]});
+  map.whenReady(function(){
+    var b=L.latLngBounds([ offM(trailer,-halfW+40,-south+30), offM(trailer,halfW-40,470) ]);
+    map.fitBounds(b,{padding:[30,30]});
+    updCounts(); requestAnimationFrame(frame);
+  });
+  document.getElementById('igniteBtn').onclick=ignite;
+  document.getElementById('resetBtn').onclick=resetFire;
 })();
 </script>
 </body>
