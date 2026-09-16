@@ -141,7 +141,7 @@ var SW = S.site.width_m, SH = S.site.height_m;
 var THROW = S.throw;                       // 50 m
 var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 // embedded in the deck, the slide carries the title — drop our own lockup
-if(/[?&]chrome=0/.test(location.search)) document.documentElement.classList.add('nochrome');
+if(/[?&]chrome=0(?:&|$)/.test(location.search)) document.documentElement.classList.add('nochrome');
 
 /* ---------------------------------------------------------------- utils */
 function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
