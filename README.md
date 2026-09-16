@@ -24,7 +24,7 @@ name except in the footer. The picture carries the detail.
 | 01 | Open data | 205 ML building footprints and 53 OSM ways draw in |
 | 02 | Block-out | classified raster wipes across: structure, pavement, water, canopy, fine fuel, bare |
 | 03 | The threat | the wildland band and the fire pushing out of the west |
-| 04 | The line | the street highlights, five stations drop **on the road** |
+| 04 | The line | the street highlights, the trailer’s eight guns drop **on the road** |
 | 05 | Coverage | 50 m circles bloom, covered structures light up |
 | 06 | Ranking | rank badges; supply drops and the lowest-ranked towers shed |
 | 07 | The sweep | every sector scored, then the stops close onto the ground worth wetting |
@@ -41,9 +41,11 @@ network and writes the result into `site.js`. The rules, in order:
    OSM road centrelines — towers land on the street, not in back yards.
 3. **Pick the street.** The westernmost north-south through-street with enough of
    the town behind it; the runner-up sits a block further east.
-4. **Space by marginal coverage.** Walking south, each station takes the spot that
-   adds the most *new* structure per unit of wasted circle, at 45–70 m. That is
-   what stops the circles overlapping where they do not need to.
+4. **Place the eight.** The trailer carries eight guns, so the question is never
+   how many towers fit — it is where those eight go. Even stations go down first so
+   the whole street is held, then each slides within about a third of a station to
+   the spot that adds the most *new* structure per unit of wasted circle. They land
+   30–49 m apart, four either side of the trailer.
 5. **Solve the sweep.** A part-circle gun sweeps one contiguous window between two
    reverse stops, so the free variables per tower are where it starts and how wide
    it is — and they are worth solving, because the ground inside a circle is not
@@ -61,16 +63,16 @@ network and writes the result into `site.js`. The rules, in order:
    currently cover — until nothing moves. Spans land between 90° and 270°, what two
    reverse stops can actually be set to.
 
-Against the same five towers spraying full circles:
+Against the same eight towers spraying full circles:
 
 | | full circles | optimised sweeps |
 |---|---|---|
-| ground wetted | 32,010 m² | **25,521 m²** (20% less) |
-| structure in it | 1,797 m² | 1,593 m² (**89% kept**) |
-| vegetation in it | 20,215 m² | 18,412 m² (**91% kept**) |
-| pavement / open ground | 9,120 m² | 4,808 m² (**47% dropped**) |
-| wasted share | 28% | **19%** |
-| double-covered | 23% | **2%** |
+| ground wetted | 33,875 m² | **26,569 m²** (22% less) |
+| structure in it | 2,163 m² | 2,114 m² (**98% kept**) |
+| vegetation in it | 21,251 m² | 18,457 m² (**87% kept**) |
+| pavement / open ground | 9,509 m² | 5,238 m² (**45% dropped**) |
+| wasted share | 28% | **20%** |
+| double-covered | 70% | **11%** |
 
 The loop shows the scoring before the cut: a ring of 10° sectors around each
 circle, green where the ground is worth wetting and red where it is not, and then
@@ -88,8 +90,8 @@ Carmanah) — the site-analysis page shown at the Sept 8 engineering meeting.
 - `assets/imagery.jpg` — Esri World Imagery, 0.39 m, over the Maple Bay box
 - `assets/blockout.png` — the block-out raster at 0.79 m, 4-bit indexed, one
   palette entry per class
-- `site.js` — 205 Microsoft ML footprints with heights, 53 OSM ways, water,
-  parks, the chosen road, and the five towers with their sector tables
+- `site.js` — Microsoft ML footprints with heights, OSM ways, water, parks, the
+  chosen road, and the eight towers with their sector tables
 
 Site is **Maple Bay, North Cowichan BC** (953 × 891 m). It is a demo site chosen
 for houses, streets, shoreline and treed lots — **not a client site**.

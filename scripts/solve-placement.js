@@ -97,7 +97,11 @@ console.log('\nchosen line:', pick.name, '(westernmost through-street with the t
 /* ------------------ place towers along that road: spacing 48-78 m, value =
    structure this tower adds that its neighbour does not already cover, less
    the share of its circle thrown at pavement, water or bare ground. */
-const MIN_SEP = 45, MAX_SEP = 70, WASTE_W = 1200;
+// The trailer carries eight guns. That is a fixed asset, so the question is never
+// how many towers fit — it is where those eight go. Four either side of the trailer,
+// which parks in the middle of the run.
+const N_GUNS = 8;
+const MIN_SEP = 30, MAX_SEP = 48, WASTE_W = 1200;
 // only stand where the town is genuinely behind you — that is what makes an
 // east-facing sweep worth setting in the first place
 const line = pick.pts.filter(p => p.structure_m2 >= 60 && p.eastShare >= 0).sort((a,b) => a.Y - b.Y);
@@ -118,27 +122,33 @@ function commit(p){
   sampleDisc(p.x, p.Y, THROW, (c, wx, wY, dx, dy, idx) => { if (c === STRUCT) wetted.add(idx); });
 }
 
-// first tower: hold the north end of the run
+// Eight guns across the usable run: lay down even stations first so the whole
+// street is held, then let each one slide to the best spot within half a station
+// of where it wants to be — the most new structure per unit of wasted circle,
+// given what the line already wets. That is the placement optimiser in one pass.
 const chosen = [];
-chosen.push(line[0]); commit(line[0]);
-
-// then walk south, each step taking the most new structure per unit waste.
-// If the street has a stretch with nothing worth defending behind it, step over it
-// rather than ending the line — a real deployment skips a block.
-const STRETCH = 115;
-for (;;) {
-  const last = chosen[chosen.length-1];
-  let reach = line.filter(p => p.Y >= last.Y + MIN_SEP && p.Y <= last.Y + MAX_SEP);
-  if (!reach.length) reach = line.filter(p => p.Y > last.Y + MAX_SEP && p.Y <= last.Y + STRETCH);
-  if (!reach.length) break;
-  let best = null, bestV = -1e9;
-  for (const p of reach) {
-    const m = marginal(p);
-    const v = m.gain - WASTE_W*m.waste;
-    if (v > bestV) { bestV = v; best = p; }
+{
+  const y0 = line[0].Y, y1 = line[line.length-1].Y;
+  const step = (y1 - y0) / (N_GUNS - 1);
+  const slack = Math.min(step*0.30, 11);
+  for (let k = 0; k < N_GUNS; k++) {
+    const target = y0 + k*step;
+    let pool = line.filter(p => Math.abs(p.Y - target) <= slack);
+    if (chosen.length) {
+      const last = chosen[chosen.length-1];
+      const ok = pool.filter(p => p.Y - last.Y >= MIN_SEP);
+      if (ok.length) pool = ok;
+    }
+    if (!pool.length) pool = [line.reduce((best,p) =>
+      Math.abs(p.Y-target) < Math.abs(best.Y-target) ? p : best, line[0])];
+    let best = null, bestV = -1e9;
+    for (const p of pool) {
+      const m = marginal(p);
+      const v = m.gain - WASTE_W*m.waste;
+      if (v > bestV) { bestV = v; best = p; }
+    }
+    chosen.push(best); commit(best);
   }
-  if (!best) break;
-  chosen.push(best); commit(best);
 }
 console.log('towers placed:', chosen.length, ' spacing',
   chosen.slice(1).map((t,k) => Math.round(t.Y - chosen[k].Y)).join(', '), 'm');

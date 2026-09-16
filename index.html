@@ -61,7 +61,7 @@
   /* ---- tower ledger, lower right ---- */
   .ledger{position:absolute;right:34px;bottom:44px;width:252px;opacity:0;transition:opacity .6s ease}
   .ledger.on{opacity:1}
-  .lg{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:center;margin-bottom:8px;
+  .lg{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:center;margin-bottom:6px;
     font-family:'JetBrains Mono',monospace;font-size:12.5px;transition:opacity .45s ease;
     text-shadow:0 2px 8px rgba(0,0,0,.95)}
   .lg .id{color:#39d2c0;font-weight:700}
@@ -174,7 +174,7 @@ var RANKED = TW.slice().sort(function(a,b){
 });
 RANKED.forEach(function(t,i){ t.rank=i+1; });
 var MAX_STRUCT = RANKED[0].structure_m2 || 1;
-var KEEP = Math.max(1, TW.length - 2);      // how many the intake can feed when supply drops
+var KEEP = Math.max(2, Math.round(TW.length * 0.6));  // what the intake can feed when supply drops
 
 BLD.forEach(function(b){
   var best=-1, bd=1e9;
@@ -554,7 +554,7 @@ function drawSupply(g, t, cam){
 }
 
 function towerAlpha(t,i){
-  var t0 = 40.6 + i*0.5;
+  var t0 = 40.6 + i*0.34;
   return track(t,[[t0,0],[t0+0.6,1],[83,1],[86,0]]);
 }
 function shedCount(t){
@@ -618,7 +618,7 @@ function drawCoverage(g, t, cam){
       if(a<=0.01) continue;
       var isShed = tw.rank > Math.round(shed);
       var dim = isShed ? lerp(1, 0.18, rk) : 1;
-      var bloom = seq(t, 49.6 + i*0.22, 1.1);
+      var bloom = seq(t, 49.6 + i*0.16, 1.1);
       var r = THROW*bloom;
       g.globalAlpha = aCirc*a*dim;
       g.beginPath(); g.arc(tw.x,tw.y,r,0,Math.PI*2);
@@ -640,7 +640,7 @@ function drawCoverage(g, t, cam){
     for(var m=0;m<TW.length;m++){
       var tm=TW[m], am=towerAlpha(t,m);
       if(am<=0.01) continue;
-      drawWorthRing(g, tm, cam, aRing*am, seq(t, 69.6 + m*0.2, 1.6));
+      drawWorthRing(g, tm, cam, aRing*am, seq(t, 69.6 + m*0.14, 1.6));
     }
   }
 
@@ -653,7 +653,7 @@ function drawCoverage(g, t, cam){
     for(var j=0;j<TW.length;j++){
       var tj=TW[j], aj=towerAlpha(t,j);
       if(aj<=0.01) continue;
-      var sweep = seq(t, 69.6 + j*0.2, 1.6);
+      var sweep = seq(t, 69.6 + j*0.14, 1.6);
       if(sweep<=0.01) continue;
       any = true;
       // the two stops close in on the recommended window from the full circle
@@ -675,7 +675,7 @@ function drawCoverage(g, t, cam){
     for(var k=0;k<TW.length;k++){
       var tk=TW[k], ak=towerAlpha(t,k);
       if(ak<=0.01) continue;
-      var sw = seq(t, 69.6 + k*0.2, 1.6);
+      var sw = seq(t, 69.6 + k*0.14, 1.6);
       if(sw<=0.01) continue;
       var isShedK = tk.rank > Math.round(shed);
       var dimK = isShedK ? lerp(1,0.18,rk) : 1;
@@ -747,7 +747,7 @@ function drawTowers(g, t, cam){
     if(a<=0.01) continue;
     var isShed = tw.rank > Math.round(shed);
     var dim = isShed ? lerp(1,0.3,rk) : 1;
-    var pop = seq(t, 40.6+i*0.5, 0.6);
+    var pop = seq(t, 40.6+i*0.34, 0.6);
 
     g.globalAlpha = a*dim;
     if(pop<1){
