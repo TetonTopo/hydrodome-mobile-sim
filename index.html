@@ -13,13 +13,12 @@
     font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
   canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   #ui{position:absolute;inset:0;pointer-events:none;z-index:5}
-  .mono{font-family:'JetBrains Mono',ui-monospace,monospace}
 
   /* ---- brand lockup, top left ---- */
   .brand{position:absolute;top:30px;left:34px;display:flex;align-items:center;gap:14px}
   .brand .mark{width:5px;height:42px;background:#db6d28;border-radius:3px;box-shadow:0 0 18px #db6d2899}
-  .brand .wd{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:26px;letter-spacing:7px;color:#fff;line-height:1;
-    text-shadow:0 2px 16px rgba(0,0,0,.95)}
+  .brand .wd{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:26px;letter-spacing:7px;color:#fff;
+    line-height:1;text-shadow:0 2px 16px rgba(0,0,0,.95)}
   .brand .wd em{font-style:normal;color:#39d2c0}
   .brand .sb{font-size:12.5px;letter-spacing:3.4px;text-transform:uppercase;color:#a6b0b8;margin-top:7px;
     text-shadow:0 2px 12px rgba(0,0,0,.95)}
@@ -37,7 +36,7 @@
   .fadein.on{opacity:1;transform:none}
   html.nofx *{transition:none!important}
 
-  /* ---- readouts, top right (single flow column so nothing collides) ---- */
+  /* ---- readouts, top right ---- */
   .rail{position:absolute;top:30px;right:34px;width:252px;text-align:right}
   .lbl{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:2.6px;color:#8d979f;
     text-transform:uppercase;margin-bottom:6px;text-shadow:0 2px 10px rgba(0,0,0,.9)}
@@ -47,9 +46,10 @@
     text-shadow:0 2px 14px rgba(0,0,0,.95)}
   .num u{text-decoration:none;font-size:15px;color:#96a0a8;margin-left:5px;letter-spacing:1px}
   .num.teal{color:#39d2c0}
+  .num small{font-size:20px;color:#8d979f;font-weight:500}
 
   /* ---- class bars ---- */
-  .classes{margin-top:2px;opacity:0;transition:opacity .6s ease}
+  .classes{margin-top:14px;opacity:0;transition:opacity .6s ease}
   .classes.on{opacity:1}
   .cl{display:grid;grid-template-columns:1fr 96px;gap:10px;align-items:center;margin-bottom:6px}
   .cl .bw{height:10px;background:#00000066;border:1px solid #ffffff1f;border-radius:2px;overflow:hidden}
@@ -61,12 +61,12 @@
   /* ---- tower ledger, lower right ---- */
   .ledger{position:absolute;right:34px;bottom:44px;width:252px;opacity:0;transition:opacity .6s ease}
   .ledger.on{opacity:1}
-  .lg{display:grid;grid-template-columns:34px 1fr 54px;gap:9px;align-items:center;margin-bottom:6px;
-    font-family:'JetBrains Mono',monospace;font-size:12px;transition:opacity .45s ease;
+  .lg{display:grid;grid-template-columns:34px 1fr 54px;gap:9px;align-items:center;margin-bottom:8px;
+    font-family:'JetBrains Mono',monospace;font-size:12.5px;transition:opacity .45s ease;
     text-shadow:0 2px 8px rgba(0,0,0,.95)}
   .lg .id{color:#39d2c0;font-weight:700}
   .lg .v{text-align:right;color:#c9d1d9}
-  .lg .bw{height:8px;background:#ffffff12;border-radius:2px;overflow:hidden;display:flex}
+  .lg .bw{height:9px;background:#00000066;border:1px solid #ffffff1a;border-radius:2px;overflow:hidden;display:flex}
   .lg .bw i{display:block;height:100%;transition:width .9s cubic-bezier(.2,.7,.2,1)}
   .lg.shed{opacity:.28}
   .lg.shed .id{color:#f85149}
@@ -141,9 +141,7 @@ var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: r
 function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
 function lerp(a,b,t){ return a+(b-a)*t; }
 function smooth(t){ t=clamp(t,0,1); return t*t*(3-2*t); }
-// progress of a sub-animation starting at t0 running for d seconds
 function seq(t,t0,d){ return smooth((t-t0)/d); }
-// keyframe track: kfs = [[time,value],...]
 function track(t,kfs){
   if(t<=kfs[0][0]) return kfs[0][1];
   for(var i=1;i<kfs.length;i++){
@@ -154,62 +152,56 @@ function track(t,kfs){
   }
   return kfs[kfs.length-1][1];
 }
-function fy(y){ return SH - y; }           // world metres -> screen-down metres
-
-/* ------------------------------------------------------------- geometry */
-// flip every polyline / polygon once, up front
+function fy(y){ return SH - y; }           // world metres (y up) -> screen-down metres
 function flipRing(r){ var o=new Array(r.length); for(var i=0;i<r.length;i++) o[i]=[r[i][0],fy(r[i][1])]; return o; }
 
+/* ------------------------------------------------------------- geometry */
 var BLD = S.buildings.map(function(b){
   var r = flipRing(b.pts), cx=0, cy=0;
   for(var i=0;i<r.length-1;i++){ cx+=r[i][0]; cy+=r[i][1]; }
   var n = Math.max(1,r.length-1);
-  return { r:r, c:[cx/n,cy/n], h:b.height||4.5, area:b.area, cov:false, tw:-1 };
+  return { r:r, c:[cx/n,cy/n], area:b.area, cov:false, tw:-1 };
 });
 var ROADS = S.roads.map(function(r){ return { cls:r.cls, pts:flipRing(r.pts) }; });
 var WATER = flipRing(S.water);
 var WOODS = S.woods.map(flipRing);
 var GRASS = S.grass.map(flipRing);
-var LINE  = flipRing(S.fire_line);
+var ROADLINE = S.line_geom.map(flipRing);   // the street the line stands on
 
 var TW = S.towers.map(function(t){
-  return { id:t.id, x:t.x, y:fy(t.y), arc:t.arc, sectors:t.sectors,
-           structure_m2:t.structure_m2, waste:t.waste_full, wasteArc:t.waste_arc,
-           structures:t.structures||0 };
+  return { id:t.id, x:t.x, y:fy(t.y), road:t.road, arc:t.arc,
+           structure_m2:t.structure_m2, structures:t.structures,
+           waste:t.waste_full, wasteArc:t.waste_arc };
 });
-// rank: structure covered first, least waste second (the demo's lexicographic rule)
+// ranking, same rule as the block-out demo: structure covered first, least waste second
 var RANKED = TW.slice().sort(function(a,b){
   if(b.structure_m2!==a.structure_m2) return b.structure_m2-a.structure_m2;
   return a.waste-b.waste;
 });
 RANKED.forEach(function(t,i){ t.rank=i+1; });
 var MAX_STRUCT = RANKED[0].structure_m2 || 1;
-var MEAN_WASTE_FULL = TW.reduce(function(a,t){ return a+t.waste; },0)/TW.length;
-var MEAN_WASTE_ARC  = TW.reduce(function(a,t){ return a+t.wasteArc; },0)/TW.length;
+var KEEP = Math.max(1, TW.length - 2);      // how many the intake can feed when supply drops
 
-// which buildings sit inside which tower circle
-var TOTAL_COV_M2 = 0;
 BLD.forEach(function(b){
   var best=-1, bd=1e9;
   for(var i=0;i<TW.length;i++){
     var d = Math.hypot(b.c[0]-TW[i].x, b.c[1]-TW[i].y);
     if(d<=THROW && d<bd){ bd=d; best=i; }
   }
-  if(best>=0){ b.cov=true; b.tw=best; TOTAL_COV_M2 += b.area; }
+  if(best>=0){ b.cov=true; b.tw=best; }
 });
-
-// stable pseudo-random draw order for the footprint reveal
 BLD.forEach(function(b,i){ b.k = ((i*2654435761)%1000)/1000; });
+
+// the tower line itself, north to south
+var LINE_PTS = TW.map(function(t){ return [t.x, t.y]; });
+var LINE_MID_Y = (TW[0].y + TW[TW.length-1].y)/2;
 
 /* --------------------------------------------------------------- canvas */
 var cv = document.getElementById('c'), ctx = cv.getContext('2d');
 var W=0, H=0, DPR=1;
-// the wetted line accumulates on its own layer, anchored to the SITE (not the screen)
-// so it stays put while the camera drifts
 var wet = document.createElement('canvas'), wctx = wet.getContext('2d');
-var WET_K = 1600/SW;                       // wet-layer pixels per metre
-wet.width  = Math.round(SW*WET_K);
-wet.height = Math.round(SH*WET_K);
+var WET_K = 1600/SW;
+wet.width = Math.round(SW*WET_K); wet.height = Math.round(SH*WET_K);
 function clearWet(){ wctx.setTransform(1,0,0,1,0,0); wctx.clearRect(0,0,wet.width,wet.height); }
 
 function resize(){
@@ -219,23 +211,23 @@ function resize(){
 }
 window.addEventListener('resize', resize);
 
-/* ------------------------------------------------------------- imagery */
 var imgOrtho = new Image(), imgBlk = new Image(), ready=0;
 imgOrtho.onload = imgBlk.onload = function(){ ready++; };
 imgOrtho.src = 'assets/imagery.jpg';
 imgBlk.src   = 'assets/blockout.png';
 
 /* -------------------------------------------------------------- camera */
+var LOOP = 88;
 var TARGET_W = 900;                        // world metres across the frame at z = 1
+var WEST_EDGE = -300;                      // we allow the view past the west edge of the
+                                           // imagery; that strip is drawn as the wildland
 function camera(t){
-  // wide on the site, pushing in to the line once the stations drop
-  var z  = REDUCED ? 1.05 : track(t,[[0,1.00],[18,1.06],[30,1.14],[40,1.60],[52,1.62],[66,1.66],[78,1.60],[81,1.06],[LOOP,1.00]]);
-  var cx = track(t,[[0,470],[18,450],[30,430],[40,292],[52,290],[66,288],[78,292],[81,455],[LOOP,470]]);
-  // during the tower beats the camera drifts slowly down the line, T1 through T10
-  var cy = track(t,[[0,300],[18,300],[30,290],[40,205],[52,255],[66,305],[78,330],[81,300],[LOOP,300]]);
+  var z  = REDUCED ? 1.04 : track(t,[[0,1.00],[18,1.03],[29,1.05],[38,1.09],[52,1.10],[70,1.13],[83,1.11],[86,1.02],[LOOP,1.00]]);
+  var cx = track(t,[[0,470],[18,450],[29,415],[38,120],[52,118],[70,112],[83,116],[86,450],[LOOP,470]]);
+  var cy = track(t,[[0,300],[18,300],[29,292],[38,268],[52,274],[70,280],[83,286],[86,300],[LOOP,300]]);
   var s  = Math.max(W/TARGET_W, H/SH) * z;
-  var vw = W/s, vh = H/s;                  // visible world box
-  cx = vw>=SW ? SW/2 : clamp(cx, vw/2, SW-vw/2);
+  var vw = W/s, vh = H/s;
+  cx = vw>=SW-WEST_EDGE ? (SW+WEST_EDGE)/2 : clamp(cx, vw/2 + WEST_EDGE, SW-vw/2);
   cy = vh>=SH ? SH/2 : clamp(cy, vh/2, SH-vh/2);
   return { s:s, cx:cx, cy:cy };
 }
@@ -245,24 +237,25 @@ function applyCam(c,g){
 }
 
 /* ------------------------------------------------------------ the film */
-var LOOP = 82;                             // seconds, seamless
 var SCENES = [
   { t:0.6,  step:'The site',      head:'A deployment site, as the truck sees it',
     body:'Maple Bay, North Cowichan &mdash; <b>953 &times; 891 m</b> of wildland-urban interface. A map, a rough idea of where fire comes from, and the operator&rsquo;s own eyes.' },
   { t:10,   step:'Step 01 &middot; Open data', head:'Most of the answer already exists, for free',
     body:'<b>205 ML building footprints</b> with height estimates, <b>53 OSM ways</b>, water and parks. Nothing flown, nothing bought.' },
-  { t:21,   step:'Step 02 &middot; Block-out', head:'Every pixel gets a class',
+  { t:20,   step:'Step 02 &middot; Block-out', head:'Every pixel gets a class',
     body:'Structure, pavement, water, canopy, fine fuel, bare ground &mdash; classified at <b>0.79 m</b>, vectors authoritative where they exist.' },
-  { t:32,   step:'Step 03 &middot; The line', head:'The operator draws the line. Stations fall out.',
-    body:'Ten stations at <b>40 m</b> along the forest edge, each throwing about <b>50 m</b>. The Moat is a line, not a ring.' },
-  { t:43,   step:'Step 04 &middot; Coverage', head:'What is actually inside each circle',
-    body:'Square metres of footprint covered, and the share of the circle spent on bare ground, pavement and water.' },
-  { t:54,   step:'Step 05 &middot; Ranking', head:'Structure first. Least waste second.',
-    body:'When the intake cannot feed all ten, the towers covering the least shed first &mdash; <b>by what they protect</b>, not by position.' },
-  { t:64,   step:'Step 06 &middot; Arc window', head:'Water only where the circle earns it',
-    body:'A recommended arc per tower keeps <b>95%+ of the structure</b> and drops the wasted share by roughly half.' },
-  { t:73,   step:'Step 07 &middot; The wet line', head:'One in five towers, every ten minutes',
-    body:'Two of ten firing at a time on a rotating duty cycle. The line stays wet on a fraction of the water.' }
+  { t:31,   step:'Step 03 &middot; The threat', head:'The fire is coming out of the west',
+    body:'That decides everything downstream. The line goes <b>between the wildland and the town</b>, not around the town.' },
+  { t:40,   step:'Step 04 &middot; The line', head:'Towers stand on the road, not in back yards',
+    body:'<b>Considine Avenue</b> is the westernmost through-street with the town behind it. Five stations, <b>47&ndash;68 m</b> apart, each throwing about 50 m.' },
+  { t:50,   step:'Step 05 &middot; Coverage', head:'What is actually inside each circle',
+    body:'Square metres of footprint covered, and the share of the circle spent on pavement, water and bare ground. Spacing is set so the circles <b>stop overlapping where they do not need to</b>.' },
+  { t:59,   step:'Step 06 &middot; Ranking', head:'Structure first. Least waste second.',
+    body:'When the intake cannot feed them all, the towers covering the least shed first &mdash; <b>by what they protect</b>, not by position.' },
+  { t:68,   step:'Step 07 &middot; Arc window', head:'Water only where the circle earns it',
+    body:'Each gun&rsquo;s arc is trimmed to the houses it is there for. Same structure kept, <b>46% less ground sprayed</b>, and nothing thrown at the street.' },
+  { t:77,   step:'Step 08 &middot; The wet line', head:'Two towers at a time, on rotation',
+    body:'A duty cycle keeps the line wet on a fraction of the water, with the arcs facing the threat side of every house.' }
 ];
 
 var els = {
@@ -274,7 +267,6 @@ var els = {
   ledlbl: document.getElementById('ledlbl'), prog: document.getElementById('prog')
 };
 
-/* class bars + tower ledger are DOM, built once */
 var CLASS_COLOR = { canopy:'#2a7a44', water:'#3878c8', bare:'#b9a98e', pavement:'#8f9499',
                     fine_fuel:'#d2ad3f', structure:'#e24b33', unknown:'#c9c9c9' };
 var CLASS_NAME  = { canopy:'canopy', water:'water', bare:'bare', pavement:'pavement',
@@ -291,13 +283,13 @@ var ledRows = RANKED.map(function(t){
   var row = document.createElement('div'); row.className='lg';
   row.innerHTML = '<div class="id">T'+t.id+'</div>'+
     '<div class="bw"><i style="background:#39d2c0"></i><i style="background:#f85149"></i></div>'+
-    '<div class="v">'+(t.structure_m2?Math.round(t.structure_m2).toLocaleString():'&mdash;')+'</div>';
+    '<div class="v">'+Math.round(t.structure_m2).toLocaleString()+'</div>';
   els.led.appendChild(row);
   var bars = row.querySelectorAll('i');
   return { el:row, t:t, sBar:bars[0], wBar:bars[1] };
 });
 
-var lastScene = -1, barsFilled = false, ledgerFilled = false;
+var lastScene = -1, barsFilled = false, ledgerFilled = false, ledgerArc = false;
 function setScene(i){
   if(i===lastScene) return;
   lastScene = i;
@@ -322,20 +314,20 @@ function drawImageLayer(g, im, a){
   if(a<=0.002 || !im.complete || !im.naturalWidth) return;
   g.globalAlpha = a; g.drawImage(im, 0, 0, SW, SH); g.globalAlpha = 1;
 }
+function bear(d){ return (d-90)*Math.PI/180; }   // bearing (0 = N, clockwise) -> canvas angle
+
+var FADE = [[83,1],[86,0]];                      // every overlay leaves together
 
 function drawVectors(g, t, cam){
-  var reveal = seq(t, 10, 3.4);                    // footprints + roads draw in
-  var aVec   = track(t,[[9.6,0],[12,1],[20,1],[24,0.5],[30,0.42],[79,0.42],[81.5,0]]);
+  var reveal = seq(t, 10, 3.4);
+  var aVec   = track(t,[[9.6,0],[12,1],[19,1],[23,0.5],[29,0.42],[83,0.42],[86,0]]);
   if(aVec<=0.002) return;
-  var px = 1/cam.s;                                 // one screen pixel in world metres
+  var px = 1/cam.s;
 
-  // water + parks, a quiet wash under everything
   g.globalAlpha = aVec*0.5;
   g.fillStyle='#1b4f86'; ring(g,WATER,true); g.fill();
   g.fillStyle='#24532f'; WOODS.concat(GRASS).forEach(function(r){ ring(g,r,true); g.fill(); });
 
-  // roads
-  g.globalAlpha = aVec*0.85*reveal;
   g.strokeStyle='#9fb0bd'; g.lineCap='round'; g.lineJoin='round';
   ROADS.forEach(function(r,i){
     var f = clamp(reveal*1.6 - (i/ROADS.length)*0.5, 0, 1);
@@ -345,13 +337,12 @@ function drawVectors(g, t, cam){
     ring(g,r.pts,false); g.stroke();
   });
 
-  // footprints, staggered by a stable hash so they pop in as a field
   g.lineWidth = 1.35*px;
   for(var i=0;i<BLD.length;i++){
     var b = BLD[i];
     var f = clamp(reveal*1.9 - b.k*0.85, 0, 1);
     if(f<=0.01) continue;
-    var lit = b.cov ? track(t,[[43,0],[46,1],[79,1],[81.5,0]]) : 0;
+    var lit = b.cov ? track(t,[[50,0],[53,1],[83,1],[86,0]]) : 0;
     g.globalAlpha = aVec*f;
     ring(g, b.r, true);
     g.fillStyle = lit>0.02 ? 'rgba(57,210,192,'+(0.20+0.30*lit)+')' : 'rgba(226,75,51,0.30)';
@@ -362,84 +353,135 @@ function drawVectors(g, t, cam){
   g.globalAlpha = 1;
 }
 
-function drawFireLine(g, t, cam){
-  var a = track(t,[[31.4,0],[33.5,1],[79,1],[81.5,0]]);
-  if(a<=0.002) return;
+/* the wildland off the west edge of the imagery, and the threat coming out of it */
+function drawThreat(g, t, cam){
+  var a = track(t,[[32,0],[35,1],[83,1],[86,0]]);
+  if(a<=0.01) return;
   var px = 1/cam.s;
-  var grow = seq(t, 31.6, 2.2);
+  var x1 = 8, x0 = WEST_EDGE - 90;
 
-  // partial polyline by arc length
-  var total=0, segs=[];
-  for(var i=1;i<LINE.length;i++){
-    var d = Math.hypot(LINE[i][0]-LINE[i-1][0], LINE[i][1]-LINE[i-1][1]);
-    segs.push(d); total+=d;
-  }
-  var want = total*grow, acc=0;
-  g.beginPath(); g.moveTo(LINE[0][0], LINE[0][1]);
-  for(var j=1;j<LINE.length;j++){
-    var d=segs[j-1];
-    if(acc+d<=want){ g.lineTo(LINE[j][0], LINE[j][1]); acc+=d; }
-    else { var f=(want-acc)/d;
-      g.lineTo(lerp(LINE[j-1][0],LINE[j][0],f), lerp(LINE[j-1][1],LINE[j][1],f)); break; }
-  }
+  g.save();
   g.globalAlpha = a;
-  g.lineCap='round'; g.lineJoin='round';
-  g.strokeStyle='rgba(219,109,40,0.16)'; g.lineWidth = 34*px; g.stroke();
-  g.strokeStyle='rgba(219,109,40,0.34)'; g.lineWidth = 15*px; g.stroke();
-  g.strokeStyle='#ff8c3a';               g.lineWidth = 4.2*px; g.stroke();
-  // threat-side ticks, pointing west into the wildland
-  g.lineWidth = 2.2*px; g.strokeStyle='rgba(255,140,58,0.75)';
-  for(var k=0;k<LINE.length-1;k++){
-    for(var u=0;u<5;u++){
-      var f=(u+0.5)/5;
-      var x=lerp(LINE[k][0],LINE[k+1][0],f), y=lerp(LINE[k][1],LINE[k+1][1],f);
-      if(Math.hypot(x-LINE[0][0], y-LINE[0][1]) > want+40) continue;
-      g.beginPath(); g.moveTo(x,y); g.lineTo(x-20, y-8); g.stroke();
+  // the band itself
+  var grad = g.createLinearGradient(x0,0,x1,0);
+  grad.addColorStop(0,'rgba(24,10,4,0.96)');
+  grad.addColorStop(0.72,'rgba(38,16,6,0.86)');
+  grad.addColorStop(1,'rgba(40,18,8,0)');
+  g.fillStyle = grad; g.fillRect(x0, -200, x1-x0, SH+400);
+  // diagonal hatch
+  g.save();
+  g.beginPath(); g.rect(x0, -200, x1-x0, SH+400); g.clip();
+  g.strokeStyle='rgba(219,109,40,0.16)'; g.lineWidth=2.2*px;
+  for(var hx=x0-SH; hx<x1+SH; hx+=26){
+    g.beginPath(); g.moveTo(hx,-200); g.lineTo(hx+SH+400, SH+200); g.stroke();
+  }
+  g.restore();
+  // the edge
+  g.strokeStyle='rgba(255,140,58,0.85)'; g.lineWidth=3*px;
+  g.beginPath(); g.moveTo(x1,-200); g.lineTo(x1,SH+200); g.stroke();
+
+  // arrows pushing east
+  var drift = REDUCED ? 0 : (t*7) % 46;
+  for(var k=-1;k<9;k++){
+    var ay = LINE_MID_Y - 320 + k*82;
+    for(var m=0;m<3;m++){
+      var ax = x0 + 26 + m*46 + drift;
+      if(ax > x1-14) continue;
+      g.globalAlpha = a*(0.30+0.22*m);
+      g.strokeStyle='#ff8c3a'; g.lineWidth=2.6*px; g.lineCap='round'; g.lineJoin='round';
+      g.beginPath();
+      g.moveTo(ax, ay); g.lineTo(ax+22, ay);
+      g.moveTo(ax+13, ay-7); g.lineTo(ax+22, ay); g.lineTo(ax+13, ay+7);
+      g.stroke();
     }
+  }
+
+  // label, upright in the band
+  g.globalAlpha = a;
+  g.textAlign='left'; g.textBaseline='middle';
+  g.fillStyle='#ff8c3a';
+  g.font='700 '+(15*px*1.6)+'px "JetBrains Mono",monospace';
+  var tx = x1 - 250;                             // always inside the frame
+  g.fillText('WILDFIRE THREAT', tx, LINE_MID_Y-14*px*1.6);
+  g.fillStyle='rgba(255,196,150,0.95)';
+  g.font='500 '+(13*px*1.6)+'px "JetBrains Mono",monospace';
+  g.fillText('FROM THE WEST', tx, LINE_MID_Y+8*px*1.6);
+  g.restore();
+  g.globalAlpha = 1;
+}
+
+/* the street the line stands on */
+function drawRoadLine(g, t, cam){
+  var a = track(t,[[39.4,0],[41.4,1],[83,1],[86,0]]);
+  if(a<=0.01) return;
+  var px = 1/cam.s;
+  var grow = seq(t, 39.6, 1.8);
+  g.globalAlpha = a*0.9;
+  g.lineCap='round'; g.lineJoin='round';
+  ROADLINE.forEach(function(seg){
+    var total=0, d=[];
+    for(var i=1;i<seg.length;i++){ var l=Math.hypot(seg[i][0]-seg[i-1][0],seg[i][1]-seg[i-1][1]); d.push(l); total+=l; }
+    var want=total*grow, acc=0;
+    g.beginPath(); g.moveTo(seg[0][0], seg[0][1]);
+    for(var j=1;j<seg.length;j++){
+      if(acc+d[j-1]<=want){ g.lineTo(seg[j][0],seg[j][1]); acc+=d[j-1]; }
+      else { var f=(want-acc)/d[j-1];
+        g.lineTo(lerp(seg[j-1][0],seg[j][0],f), lerp(seg[j-1][1],seg[j][1],f)); break; }
+    }
+    g.strokeStyle='rgba(57,210,192,0.18)'; g.lineWidth=20*px; g.stroke();
+    g.strokeStyle='rgba(57,210,192,0.85)'; g.lineWidth=3.4*px; g.stroke();
+  });
+  // road name, once the line is drawn
+  if(grow>0.9){
+    g.globalAlpha = a*0.9;
+    g.textAlign='left'; g.textBaseline='middle';
+    g.font='500 '+(12*px*1.6)+'px "JetBrains Mono",monospace';
+    g.lineWidth=3.4*px; g.strokeStyle='rgba(6,10,13,0.92)';
+    var lx = TW[0].x + 17*px*1.6, ly = TW[0].y - 30*px*1.6;
+    g.strokeText(S.line_road.toUpperCase(), lx, ly);
+    g.fillStyle='rgba(160,240,232,0.95)';
+    g.fillText(S.line_road.toUpperCase(), lx, ly);
   }
   g.globalAlpha = 1;
 }
 
-// bearing (0 = north, clockwise) -> canvas angle in screen-down space
-function bear(d){ return (d-90)*Math.PI/180; }
-
 function towerAlpha(t,i){
-  var t0 = 34.2 + i*0.42;                 // stations drop in sequence
-  return track(t,[[t0,0],[t0+0.6,1],[79,1],[81.5,0]]);
+  var t0 = 40.6 + i*0.5;
+  return track(t,[[t0,0],[t0+0.6,1],[83,1],[86,0]]);
 }
+function shedCount(t){
+  return track(t,[[60.5,TW.length],[63,KEEP],[66,KEEP],[67.5,TW.length]]);
+}
+function rankOn(t){ return track(t,[[58.6,0],[61,1],[67,1],[69,0]]); }
 
 function drawCoverage(g, t, cam){
   var px = 1/cam.s;
-  var aCirc = track(t,[[42.6,0],[45,1],[62,1],[65.5,0]]);        // full circles
-  var aArc  = track(t,[[63.5,0],[66.5,1],[79,1],[81.5,0]]);        // recommended arcs
-  var shed  = track(t,[[54.5,10],[59,6],[62.5,6],[64,10]]);      // supply slider 10 -> 6 -> 10
-  var rankOn= track(t,[[53.5,0],[56,1],[63,1],[65,0]]);
+  var aCirc = track(t,[[49.4,0],[51.4,1],[68,1],[71,0]]);
+  var aArc  = track(t,[[68.5,0],[71.5,1],[83,1],[86,0]]);
+  var shed  = shedCount(t), rk = rankOn(t);
 
   for(var i=0;i<TW.length;i++){
     var tw=TW[i], a=towerAlpha(t,i);
     if(a<=0.01) continue;
     var isShed = tw.rank > Math.round(shed);
-    var dim = isShed ? lerp(1, 0.18, rankOn) : 1;
+    var dim = isShed ? lerp(1, 0.18, rk) : 1;
 
-    // full circle
     if(aCirc>0.01){
-      var bloom = seq(t, 42.8 + i*0.16, 1.1);
+      var bloom = seq(t, 49.6 + i*0.22, 1.1);
       var r = THROW*bloom;
       g.globalAlpha = aCirc*a*dim;
       g.beginPath(); g.arc(tw.x,tw.y,r,0,Math.PI*2);
-      g.fillStyle='rgba(57,210,192,0.13)'; g.fill();
+      g.fillStyle='rgba(57,210,192,0.12)'; g.fill();
       g.strokeStyle='rgba(6,16,19,0.55)'; g.lineWidth=5.0*px; g.stroke();
       g.strokeStyle='rgba(112,247,231,0.95)'; g.lineWidth=2.2*px; g.stroke();
-      // expanding ping as it blooms
       if(bloom<1){
         g.globalAlpha = aCirc*a*dim*(1-bloom);
         g.beginPath(); g.arc(tw.x,tw.y, r*1.12, 0, Math.PI*2);
         g.strokeStyle='rgba(180,255,246,0.9)'; g.lineWidth=2.6*px; g.stroke();
       }
     }
-    // recommended arc wedge, sweeping open from the circle
     if(aArc>0.01){
-      var sweep = seq(t, 64 + i*0.17, 1.3);
+      var sweep = seq(t, 68.8 + i*0.22, 1.3);
       var span = lerp(360, tw.arc.span, sweep);
       var st   = bear(lerp(tw.arc.start - (360-tw.arc.span)/2, tw.arc.start, sweep));
       g.globalAlpha = aArc*a*dim;
@@ -453,16 +495,15 @@ function drawCoverage(g, t, cam){
   g.globalAlpha=1;
 }
 
-// duty cycle: two of ten firing, rotating — drawn into the persistent wet layer
 var firedUpTo = -1;
 function drawDuty(g, t, cam){
-  var a = track(t,[[72.4,0],[74.5,1],[79.5,1],[81.5,0]]);
+  var a = track(t,[[76.4,0],[78.5,1],[83,1],[86,0]]);
   if(a<=0.01) return;
   var px = 1/cam.s;
-  var slot = Math.floor((t-72.4)/1.15);
-  var active = [ (slot*2)%10, (slot*2+1)%10 ];
+  var slot = Math.floor((t-76.4)/1.15);
+  var n = TW.length;
+  var active = [ ((slot*2)%n+n)%n, ((slot*2+1)%n+n)%n ];
 
-  // bank into the accumulating wet layer, in site coordinates
   if(slot>firedUpTo && slot>=0){
     firedUpTo = slot;
     wctx.setTransform(WET_K,0,0,WET_K,0,0);
@@ -483,7 +524,7 @@ function drawDuty(g, t, cam){
     g.fillStyle='rgba(88,166,255,0.33)'; g.fill();
     g.strokeStyle='rgba(160,220,255,0.95)'; g.lineWidth=2.4*px; g.stroke();
     g.globalAlpha = a;
-    g.beginPath(); g.arc(tw.x,tw.y, 4.5*px*2.4, 0, Math.PI*2);
+    g.beginPath(); g.arc(tw.x,tw.y, 10*px, 0, Math.PI*2);
     g.fillStyle='#f85149'; g.fill();
   });
   g.globalAlpha=1;
@@ -491,49 +532,45 @@ function drawDuty(g, t, cam){
 
 function drawTowers(g, t, cam){
   var px = 1/cam.s;
-  var rankOn = track(t,[[53.5,0],[56,1],[63,1],[65.5,0]]);
-  var shed   = track(t,[[54.5,10],[59,6],[62.5,6],[64,10]]);
+  var rk = rankOn(t), shed = shedCount(t);
   for(var i=0;i<TW.length;i++){
     var tw=TW[i], a=towerAlpha(t,i);
     if(a<=0.01) continue;
     var isShed = tw.rank > Math.round(shed);
-    var dim = isShed ? lerp(1,0.3,rankOn) : 1;
-    var pop = seq(t, 34.2+i*0.42, 0.6);
+    var dim = isShed ? lerp(1,0.3,rk) : 1;
+    var pop = seq(t, 40.6+i*0.5, 0.6);
 
     g.globalAlpha = a*dim;
-    // drop ring
     if(pop<1){
-      g.beginPath(); g.arc(tw.x,tw.y, lerp(26,7,pop)*px*2.2, 0, Math.PI*2);
+      g.beginPath(); g.arc(tw.x,tw.y, lerp(30,10,pop)*px*2.2, 0, Math.PI*2);
       g.strokeStyle='rgba(57,210,192,'+(1-pop)+')'; g.lineWidth=2*px; g.stroke();
     }
-    g.beginPath(); g.arc(tw.x, tw.y, 6.2*px*1.6, 0, Math.PI*2);
-    g.fillStyle = isShed && rankOn>0.5 ? '#f85149' : '#39d2c0';
-    g.strokeStyle='#0b1013'; g.lineWidth=1.6*px; g.fill(); g.stroke();
+    g.beginPath(); g.arc(tw.x, tw.y, 10*px, 0, Math.PI*2);
+    g.fillStyle = isShed && rk>0.5 ? '#f85149' : '#39d2c0';
+    g.strokeStyle='#0b1013'; g.lineWidth=2*px; g.fill(); g.stroke();
 
-    // label: T-id, and its rank once ranking is on screen
-    var lx = tw.x + 11*px*1.6, ly = tw.y - 9*px*1.6;
-    g.font = (13*px*1.6)+'px "JetBrains Mono", monospace';
-    g.textBaseline='middle';
-    g.lineWidth = 3.2*px; g.strokeStyle='rgba(6,10,13,0.92)';
-    var lbl = 'T'+tw.id + (rankOn>0.35 ? '  #'+tw.rank : '');
+    var lx = tw.x + 15*px, ly = tw.y - 14*px;
+    g.textAlign='left'; g.textBaseline='middle';
+    g.font='500 '+(13*px*1.6)+'px "JetBrains Mono", monospace';
+    g.lineWidth = 3.4*px; g.strokeStyle='rgba(6,10,13,0.92)';
+    var lbl = 'T'+tw.id + (rk>0.35 ? '  #'+tw.rank : '');
     g.strokeText(lbl, lx, ly);
-    g.fillStyle = isShed && rankOn>0.5 ? '#f85149' : '#cfe9e6';
+    g.fillStyle = isShed && rk>0.5 ? '#f85149' : '#cfe9e6';
     g.fillText(lbl, lx, ly);
   }
   g.globalAlpha=1;
 }
 
-// embers drifting in from the wildland side, very quiet
-var EMB=[]; for(var e=0;e<70;e++) EMB.push({ x:Math.random()*260-40, y:Math.random()*SH, v:6+Math.random()*16, r:Math.random()*1.6+0.5, p:Math.random() });
+var EMB=[]; for(var e=0;e<70;e++) EMB.push({ x:Math.random()*340+WEST_EDGE-90, y:Math.random()*SH, v:7+Math.random()*16, r:Math.random()*1.6+0.6, p:Math.random() });
 function drawEmbers(g, t, cam){
-  var a = track(t,[[70,0],[74,0.75],[79.5,0.75],[81.5,0]]);
+  var a = track(t,[[34,0],[38,0.7],[83,0.7],[86,0]]);
   if(a<=0.01 || REDUCED) return;
   var px = 1/cam.s;
   for(var i=0;i<EMB.length;i++){
     var m=EMB[i];
-    var x = m.x + ((t*m.v) % 300);
+    var x = m.x + ((t*m.v) % 380);
     var y = m.y + Math.sin(t*0.9+m.p*9)*7;
-    g.globalAlpha = a*(0.25+0.5*Math.abs(Math.sin(t*2+m.p*7)));
+    g.globalAlpha = a*(0.22+0.45*Math.abs(Math.sin(t*2+m.p*7)));
     g.beginPath(); g.arc(x, y, m.r*px*2.2, 0, Math.PI*2);
     g.fillStyle='#ffb067'; g.fill();
   }
@@ -541,9 +578,8 @@ function drawEmbers(g, t, cam){
 }
 
 /* --------------------------------------------------------------- render */
-var t0 = performance.now()/1000, prevLoopN = 0;
+var t0 = performance.now()/1000, prevLoopN = 0, paused = false;
 
-var paused = false;
 function frame(){
   requestAnimationFrame(frame);
   if(document.hidden || paused) return;
@@ -555,8 +591,8 @@ function render(t, loopN){
   if(!W || cv.clientWidth!==W || cv.clientHeight!==H) resize();
   if(ready<2) return;
 
-  if(loopN!==prevLoopN){                       // seamless restart
-    prevLoopN = loopN; firedUpTo = -1; barsFilled = false; ledgerFilled = false;
+  if(loopN!==prevLoopN){
+    prevLoopN = loopN; firedUpTo = -1; barsFilled = false; ledgerFilled = false; ledgerArc = false;
     clearWet();
     clsBars.forEach(function(b){ b.el.style.width='0%'; });
     ledRows.forEach(function(r){ r.sBar.style.width='0%'; r.wBar.style.width='0%'; });
@@ -567,16 +603,14 @@ function render(t, loopN){
   ctx.fillStyle='#080b0e'; ctx.fillRect(0,0,cv.width,cv.height);
   applyCam(cam, ctx);
 
-  // imagery, always on; the block-out wipes in over it
-  drawImageLayer(ctx, imgOrtho, track(t,[[0,0],[1.6,1],[80.5,1],[LOOP,0]]));
+  drawImageLayer(ctx, imgOrtho, track(t,[[0,0],[1.6,1],[86.5,1],[LOOP,0]]));
 
-  var blkA = track(t,[[20.6,0],[23,0.82],[30,0.78],[34,0.42],[44,0.30],[79,0.26],[81.5,0]]);
+  var blkA = track(t,[[20.6,0],[23,0.82],[29,0.78],[33,0.42],[44,0.30],[83,0.26],[86,0]]);
   if(blkA>0.002){
     var wipe = seq(t, 20.6, 2.6);
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, SW*wipe, SH); ctx.clip();
     drawImageLayer(ctx, imgBlk, blkA);
-    // leading edge of the wipe
     if(wipe<1 && wipe>0){
       ctx.globalAlpha = 0.9;
       ctx.strokeStyle='#39d2c0'; ctx.lineWidth=2.4/cam.s;
@@ -587,11 +621,11 @@ function render(t, loopN){
   }
 
   drawVectors(ctx, t, cam);
-  drawFireLine(ctx, t, cam);
+  drawThreat(ctx, t, cam);
+  drawRoadLine(ctx, t, cam);
   drawCoverage(ctx, t, cam);
 
-  // the accumulated wet line sits under the live arcs, anchored to the site
-  ctx.globalAlpha = track(t,[[72.4,0],[74.5,1],[79.5,1],[81.5,0]]);
+  ctx.globalAlpha = track(t,[[76.4,0],[78.5,1],[83,1],[86,0]]);
   ctx.drawImage(wet, 0, 0, SW, SH);
   ctx.globalAlpha = 1;
 
@@ -599,7 +633,7 @@ function render(t, loopN){
   drawTowers(ctx, t, cam);
   drawEmbers(ctx, t, cam);
 
-  // vignette so the overlay type always has something to sit on
+  // plates so the overlay type always has something to sit on
   ctx.setTransform(1,0,0,1,0,0);
   var gr = ctx.createLinearGradient(0, cv.height*0.42, 0, cv.height);
   gr.addColorStop(0,'rgba(6,9,12,0)'); gr.addColorStop(0.55,'rgba(6,9,12,0.55)'); gr.addColorStop(1,'rgba(6,9,12,0.92)');
@@ -607,71 +641,70 @@ function render(t, loopN){
   var gt = ctx.createLinearGradient(0,0,0,cv.height*0.26);
   gt.addColorStop(0,'rgba(6,9,12,0.86)'); gt.addColorStop(1,'rgba(6,9,12,0)');
   ctx.fillStyle=gt; ctx.fillRect(0,0,cv.width,cv.height*0.26);
-  // a touch of corner falloff so the right-hand readouts always have a base
   var gs = ctx.createLinearGradient(cv.width*0.66,0,cv.width,0);
   gs.addColorStop(0,'rgba(6,9,12,0)'); gs.addColorStop(1,'rgba(6,9,12,0.55)');
   ctx.fillStyle=gs; ctx.fillRect(cv.width*0.66,0,cv.width*0.34,cv.height);
 
-  /* ---- overlay state ---- */
+  /* ---- overlay ---- */
   var si = 0;
   for(var i=0;i<SCENES.length;i++) if(t>=SCENES[i].t) si=i;
   setScene(si);
 
-  els.g1.classList.toggle('on', t>1.2 && t<80.5);
-  els.g2.classList.toggle('on', t>10 && t<80.5);
-  els.g3.classList.toggle('on', t>43.4 && t<80.5);
+  els.g1.classList.toggle('on', t>1.2 && t<86.5);
+  els.g2.classList.toggle('on', t>10 && t<86.5);
+  els.g3.classList.toggle('on', t>49.8 && t<86.5);
 
   var nb = Math.round(BLD.length*clamp(seq(t,10,3.4)*1.05,0,1));
   els.n2.textContent = nb ? nb.toLocaleString() : '0';
 
-  if(t>66.5){
-    // the punchline of the arc beat: mean wasted share, full circle vs recommended arc
-    var wNow = Math.round(lerp(MEAN_WASTE_FULL, MEAN_WASTE_ARC, seq(t,66.5,2.0))*100);
+  if(t>71){
+    var wNow = Math.round(lerp(S.mean_waste_full, S.mean_waste_arc, seq(t,71,2.0))*100);
     els.l3.textContent = 'Wasted share · circle → arc';
-    els.n3.innerHTML = Math.round(MEAN_WASTE_FULL*100)+'% <u>&rarr;</u> '+wNow+'%';
+    els.n3.innerHTML = Math.round(S.mean_waste_full*100)+'<small>%</small> <u>&rarr;</u> '+wNow+'<small>%</small>';
   } else {
     els.l3.textContent = 'Structure under cover';
-    els.n3.innerHTML = Math.round(TOTAL_COV_M2*seq(t,43.4,2.2)).toLocaleString()+' <u>m&sup2;</u>';
+    els.n3.innerHTML = Math.round(S.structure_covered_m2*seq(t,49.8,2.2)).toLocaleString()+' <u>m&sup2;</u>';
   }
 
-  var clsOn = t>21 && t<80.5;
+  var clsOn = t>20 && t<86.5;
   els.cls.classList.toggle('on', clsOn);
   if(clsOn && !barsFilled){ barsFilled = true; clsBars.forEach(function(b){ b.el.style.width = b.pct+'%'; }); }
 
-  var ledOn = t>53.6 && t<80.5;
+  var ledOn = t>58.8 && t<86.5;
   els.led.classList.toggle('on', ledOn);
-  els.ledlbl.textContent = t>63.5 ? 'Tower ledger · arc window' : 'Tower ledger · structure / waste';
+  els.ledlbl.textContent = t>69 ? 'Tower ledger · arc window' : 'Tower ledger · structure / waste';
   if(ledOn && !ledgerFilled){
     ledgerFilled = true;
     ledRows.forEach(function(r){
       r.sBar.style.width = Math.round(72*(r.t.structure_m2/MAX_STRUCT))+'%';
-      r.wBar.style.width = Math.round(28*(r.t.waste/0.4))+'%';
+      r.wBar.style.width = Math.round(28*(r.t.waste/0.5))+'%';
     });
   }
   if(ledOn){
-    var shedN = Math.round(track(t,[[54.5,10],[59,6],[62.5,6],[64,10]]));
+    var shedN = Math.round(shedCount(t));
     ledRows.forEach(function(r){ r.el.classList.toggle('shed', r.t.rank>shedN); });
-    if(t>65.5){
-      ledRows.forEach(function(r){ r.wBar.style.width = Math.round(28*(r.t.wasteArc/0.4))+'%'; });
+    if(t>71 && !ledgerArc){
+      ledgerArc = true;
+      ledRows.forEach(function(r){ r.wBar.style.width = Math.round(28*(r.t.wasteArc/0.5))+'%'; });
     }
   }
 
   els.prog.style.width = (t/LOOP*100).toFixed(2)+'%';
 }
 
-// jump to / draw a single point in the loop — used when checking the film, inert in the deck
 function reset(){
-  prevLoopN = 0; firedUpTo = -1; lastScene = -1; barsFilled = false; ledgerFilled = false;
+  prevLoopN = 0; firedUpTo = -1; lastScene = -1;
+  barsFilled = false; ledgerFilled = false; ledgerArc = false;
   clearWet();
   clsBars.forEach(function(b){ b.el.style.width='0%'; });
   ledRows.forEach(function(r){ r.sBar.style.width='0%'; r.wBar.style.width='0%'; });
 }
+// jump to / draw a point in the loop — used when checking the film, inert in the deck
 window.__moat = {
   loop: LOOP,
   scenes: SCENES.map(function(s){ return s.t; }),
-  seek: function(s){ t0 = performance.now()/1000 - s; reset(); },
-  // draw one frame at time s without the rAF clock (for stills)
   play: function(){ paused=false; },
+  seek: function(s){ t0 = performance.now()/1000 - s; reset(); },
   step: function(s){
     paused = true;
     document.documentElement.classList.add('nofx');
@@ -681,10 +714,10 @@ window.__moat = {
     var sc=SCENES[si];
     els.step.innerHTML=sc.step; els.head.innerHTML=sc.head; els.body.innerHTML=sc.body;
     [els.stepBox, els.head, els.body].forEach(function(e){ e.classList.add('on'); });
-    if(s>21) clsBars.forEach(function(b){ b.el.style.width=b.pct+'%'; });
-    if(s>53.6) ledRows.forEach(function(r){
+    if(s>20) clsBars.forEach(function(b){ b.el.style.width=b.pct+'%'; });
+    if(s>58.8) ledRows.forEach(function(r){
       r.sBar.style.width = Math.round(72*(r.t.structure_m2/MAX_STRUCT))+'%';
-      r.wBar.style.width = Math.round(28*((s>65.5?r.t.wasteArc:r.t.waste)/0.4))+'%';
+      r.wBar.style.width = Math.round(28*((s>71?r.t.wasteArc:r.t.waste)/0.5))+'%';
     });
     return s;
   }
