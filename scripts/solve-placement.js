@@ -98,7 +98,9 @@ console.log('\nchosen line:', pick.name, '(westernmost through-street with the t
    structure this tower adds that its neighbour does not already cover, less
    the share of its circle thrown at pavement, water or bare ground. */
 const MIN_SEP = 45, MAX_SEP = 70, WASTE_W = 1200;
-const line = pick.pts.filter(p => p.structure_m2 >= 60).sort((a,b) => a.Y - b.Y);
+// only stand where the town is genuinely behind you — that is what makes an
+// east-facing sweep worth setting in the first place
+const line = pick.pts.filter(p => p.structure_m2 >= 60 && p.eastShare >= 0).sort((a,b) => a.Y - b.Y);
 
 // marginal value of standing here, given what the line already wets
 const wetted = new Set();
@@ -116,27 +118,24 @@ function commit(p){
   sampleDisc(p.x, p.Y, THROW, (c, wx, wY, dx, dy, idx) => { if (c === STRUCT) wetted.add(idx); });
 }
 
-// first tower: the best spot in the northern end of the road
+// first tower: hold the north end of the run
 const chosen = [];
-{
-  const head = line.filter(p => p.Y <= line[0].Y + 55);
-  let best = head[0];
-  for (const p of head) {
-    const m = marginal(p), bm = marginal(best);
-    if (m.gain - WASTE_W*m.waste > bm.gain - WASTE_W*bm.waste) best = p;
-  }
-  chosen.push(best); commit(best);
-}
-// then walk south, each step taking the most new structure per unit waste
+chosen.push(line[0]); commit(line[0]);
+
+// then walk south, each step taking the most new structure per unit waste.
+// If the street has a stretch with nothing worth defending behind it, step over it
+// rather than ending the line — a real deployment skips a block.
+const STRETCH = 115;
 for (;;) {
   const last = chosen[chosen.length-1];
-  const reach = line.filter(p => p.Y >= last.Y + MIN_SEP && p.Y <= last.Y + MAX_SEP);
+  let reach = line.filter(p => p.Y >= last.Y + MIN_SEP && p.Y <= last.Y + MAX_SEP);
+  if (!reach.length) reach = line.filter(p => p.Y > last.Y + MAX_SEP && p.Y <= last.Y + STRETCH);
   if (!reach.length) break;
   let best = null, bestV = -1e9;
   for (const p of reach) {
     const m = marginal(p);
     const v = m.gain - WASTE_W*m.waste;
-    if (v > bestV) { bestV = v; best = p; best.gain = m.gain; }
+    if (v > bestV) { bestV = v; best = p; }
   }
   if (!best) break;
   chosen.push(best); commit(best);
@@ -158,33 +157,41 @@ function sectors(t){
   return rows.map(r => ({ a0:r.a0, structure_m2:r.n[STRUCT]*PX_M2,
                           waste: r.tot ? (r.n[PAVE]+r.n[WATER]+r.n[BARE])/r.tot : 0, tot:r.tot }));
 }
-// A Nelson part-circle gun is set by hand with two reverse stops, so the
-// recommendation has to be a setting somebody would actually dial in: at least a
-// quadrant, never more than three quarters, keeping ~90% of the structure.
-const MIN_SPAN_DEG = 90, MAX_SPAN_DEG = 270, KEEP_STRUCT = 0.90;
+// A Nelson part-circle gun sweeps between two reverse stops the operator sets by
+// hand. So the recommendation has to be one continuous window, wide enough to be a
+// real setting and narrow enough to mean something: half a circle, give or take.
+// Pick the window that protects the most structure for the least wasted ground —
+// no capture threshold, no tie-breaks, just one score. That keeps the five towers
+// reading as one family instead of one sliver and one near-circle.
+// One rule, the same for every gun on every site: a Nelson part-circle sweeps the
+// half-circle facing what it is there to protect. The operator sets two reverse
+// stops; there is nothing to optimise and nothing to explain. The span is fixed at
+// 180 deg so the line reads as one system, and the centre is the bearing of the
+// structure the tower actually covers, rounded to the 10 deg the sector table uses.
+// Half the water is off the table by construction, and the half that goes is aimed
+// at buildings rather than at the road and the open ground behind the gun.
+const ARC_SPAN = 180;
+const PROTECTED_BEARING = 90;        // the town side; the fire is out of the west
+const MAX_OFF_AXIS = 70;             // how far the sweep may swing to follow the houses
+function angDiff(x, y){ const d = Math.abs(x-y)%360; return d > 180 ? 360-d : d; }
 function bestArc(rows, total){
-  const all = () => { let w=0,t=0; for (const r of rows){ w+=r.waste*r.tot; t+=r.tot; } return t?w/t:0; };
+  const L = ARC_SPAN/SEC;
   let best = null;
-  const fullWaste = all();
   for (let st = 0; st < NS; st++) {
-    let sSum=0, wSum=0, tSum=0;
-    for (let L = 1; L <= NS; L++) {
-      const r = rows[(st+L-1)%NS];
+    const centre = (st*SEC + ARC_SPAN/2) % 360;
+    // never sweep back into the wildland: the water goes across what is behind you
+    if (angDiff(centre, PROTECTED_BEARING) > MAX_OFF_AXIS) continue;
+    let sSum = 0, wSum = 0, tSum = 0;
+    for (let k = 0; k < L; k++) {
+      const r = rows[(st+k)%NS];
       sSum += r.structure_m2; wSum += r.waste*r.tot; tSum += r.tot;
-      const span = L*SEC;
-      if (span > MAX_SPAN_DEG) break;
-      if (span < MIN_SPAN_DEG) continue;
-      if (total > 0 && sSum < total*KEEP_STRUCT) continue;
-      const c = { start:st*SEC, span, structure_capture: total>0 ? sSum/total : 1,
-                  waste: tSum?wSum/tSum:0 };
-      // least waste first, then the narrowest arc that ties
-      if (!best || c.waste < best.waste - 0.005 ||
-          (Math.abs(c.waste - best.waste) <= 0.005 && c.span < best.span)) best = c;
-      break;                                   // narrowest window from this start
     }
+    if (!best || sSum > best.sSum)
+      best = { start: st*SEC, span: ARC_SPAN, sSum, centre,
+               structure_capture: total > 0 ? sSum/total : 1,
+               waste: tSum ? wSum/tSum : 0 };
   }
-  // nothing satisfies the structure rule inside 270 deg: fall back to the circle
-  return best || { start:0, span:360, structure_capture:1, waste:fullWaste };
+  return best;
 }
 
 /* --------------------------------------------------- overlap: circle vs arc */
@@ -244,10 +251,26 @@ let covered = 0; { const seen = new Set();
   for (const t of chosen) sampleDisc(t.x, t.Y, THROW, (c,wx,wY,dx,dy,idx)=>{ if(c===STRUCT) seen.add(idx); });
   covered = Math.round(seen.size*PX_M2); }
 
-console.log('\nmean wasted share   full circle', mf.toFixed(3), '  recommended arc', ma.toFixed(3));
+function structureIn(useArc){
+  const seen = new Set();
+  for (const t of chosen)
+    sampleDisc(t.x, t.Y, THROW, (c, wx, wY, dx, dy, idx) => {
+      if (useArc && !inArc(t, wx, wY)) return;
+      if (c === STRUCT) seen.add(idx);
+    });
+  return seen.size*PX_M2;
+}
+const sC = structureIn(false), sA = structureIn(true);
+const effC = sC/ovC.area, effA = sA/ovA.area;
+console.log('');
+console.log('mean wasted share   full circle', mf.toFixed(3), '  half-circle', ma.toFixed(3));
 console.log('double-covered ground (circles)', (ovC.share*100).toFixed(0)+'%');
-console.log('sprayed area   circles', Math.round(ovC.area), 'm2  ->  arcs', Math.round(ovA.area), 'm2  (', Math.round((1-ovA.area/ovC.area)*100)+'% less )');
-console.log('structure covered', covered, 'm2');
+console.log('sprayed ground   circles', Math.round(ovC.area), 'm2  ->  arcs', Math.round(ovA.area),
+  'm2  (', Math.round((1-ovA.area/ovC.area)*100)+'% less )');
+console.log('structure wetted  circles', Math.round(sC), 'm2  arcs', Math.round(sA), 'm2  (kept',
+  Math.round(sA/sC*100)+'% )');
+console.log('structure per 1000 m2 sprayed:', (effC*1000).toFixed(0), '->', (effA*1000).toFixed(0),
+  ' (', (effA/effC).toFixed(2)+'x )');
 
 fs.writeFileSync(__dirname + '/placement.json', JSON.stringify({
   towers,
@@ -261,6 +284,9 @@ fs.writeFileSync(__dirname + '/placement.json', JSON.stringify({
   overlap_arcs: +ovA.share.toFixed(3),
   structure_covered_m2: covered,
   mean_waste_full: +mf.toFixed(3),
-  mean_waste_arc: +ma.toFixed(3)
+  mean_waste_arc: +ma.toFixed(3),
+  structure_circles_m2: Math.round(sC),
+  structure_arcs_m2: Math.round(sA),
+  efficiency_gain: +(effA/effC).toFixed(2)
 }, null, 1));
 console.log('\nwrote placement.json');
