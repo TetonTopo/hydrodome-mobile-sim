@@ -163,7 +163,7 @@ var GRASS = S.grass.map(flipRing);
 var ROADLINE = S.line_geom.map(flipRing);   // the street the line stands on
 
 var TW = S.towers.map(function(t){
-  return { id:t.id, x:t.x, y:fy(t.y), road:t.road, arc:t.arc,
+  return { id:t.id, x:t.x, y:fy(t.y), road:t.road, arc:t.arc, sectors:t.sectors,
            structure_m2:t.structure_m2, structures:t.structures,
            waste:t.waste_full, wasteArc:t.waste_arc };
 });
@@ -250,8 +250,8 @@ var SCENES = [
     body:'Buildings inside the throw, weighed against water thrown at road, water and open ground.' },
   { t:59,   step:'Step 06', head:'Structure first. Least waste second.',
     body:'When the intake cannot feed them all, the towers covering the least shed first.' },
-  { t:68,   step:'Step 07', head:'Each gun sweeps the half it is there for',
-    body:'Two reverse stops, set by hand. <b>Half the ground wetted</b>, and none of it thrown back at the fire.' },
+  { t:68,   step:'Step 07', head:'Every sector scored, then the stops set',
+    body:'Houses and the fuel around them are worth wetting. Road and open ground are not.' },
   { t:77,   step:'Step 08', head:'A wet line, on a fraction of the water',
     body:'Two towers at a time, rotating, holding the flank the embers arrive on.' }
 ];
@@ -449,17 +449,42 @@ function sweepPath(g, cx, cy, a0, a1, r0, r1){
 }
 function sweepFill(g, cx, cy, r0, r1){
   var gr = g.createRadialGradient(cx, cy, r0, cx, cy, r1);
-  gr.addColorStop(0,    'rgba(57,210,192,0.10)');
-  gr.addColorStop(0.30, 'rgba(70,225,205,0.46)');
-  gr.addColorStop(0.80, 'rgba(70,225,205,0.50)');
-  gr.addColorStop(1,    'rgba(90,235,215,0.06)');
+  gr.addColorStop(0,    'rgba(57,210,192,0.07)');
+  gr.addColorStop(0.30, 'rgba(70,225,205,0.32)');
+  gr.addColorStop(0.80, 'rgba(70,225,205,0.36)');
+  gr.addColorStop(1,    'rgba(90,235,215,0.05)');
   return gr;
+}
+
+// what every 10 deg sector of a tower's reach is worth: green is ground worth
+// wetting, red is water thrown at pavement, open water or bare dirt. This is the
+// thing the window is solved against, so it is worth showing before the cut.
+function drawWorthRing(g, tw, cam, alpha, close){
+  var px = 1/cam.s, r0 = THROW*1.05, r1 = THROW*1.30;
+  for(var k=0;k<tw.sectors.length;k++){
+    var sc = tw.sectors[k];
+    var a0 = bear(sc.a0), a1 = bear(sc.a0 + 10);
+    var rel = sc.a0 - tw.arc.start; if(rel<0) rel += 360;
+    var kept = rel < tw.arc.span;
+    var v = sc.v;
+    var mag = Math.min(1, Math.abs(v));
+    // as the stops close in, the sectors being given up drop away
+    var fade = kept ? 1 : lerp(1, 0.12, close);
+    g.globalAlpha = alpha*fade*(0.22 + 0.70*mag);
+    sweepPath(g, tw.x, tw.y, a0, a1, r0, r1);
+    g.fillStyle = v >= 0 ? 'rgba(74,214,138,1)' : 'rgba(240,96,74,1)';
+    g.fill();
+  }
+  g.globalAlpha = alpha*0.5;
+  g.beginPath(); g.arc(tw.x, tw.y, r0, 0, Math.PI*2);
+  g.strokeStyle='rgba(255,255,255,0.22)'; g.lineWidth=1*px; g.stroke();
+  g.globalAlpha = 1;
 }
 
 function drawCoverage(g, t, cam){
   var px = 1/cam.s;
-  var aCirc = track(t,[[49.4,0],[51.4,1],[68,1],[71,0]]);
-  var aArc  = track(t,[[68.5,0],[71.5,1],[83,1],[86,0]]);
+  var aCirc = track(t,[[49.4,0],[51.4,1],[69,1],[72,0]]);
+  var aArc  = track(t,[[69.4,0],[72,1],[83,1],[86,0]]);
   var shed  = shedCount(t), rk = rankOn(t);
 
   // reach: the whole circle, drawn light — this is what the gun could wet
@@ -485,6 +510,16 @@ function drawCoverage(g, t, cam){
     g.globalAlpha=1;
   }
 
+  // the score first, then the cut
+  var aRing = track(t,[[67.6,0],[69.2,1],[75,1],[77.5,0]]);
+  if(aRing>0.01){
+    for(var m=0;m<TW.length;m++){
+      var tm=TW[m], am=towerAlpha(t,m);
+      if(am<=0.01) continue;
+      drawWorthRing(g, tm, cam, aRing*am, seq(t, 69.6 + m*0.2, 1.6));
+    }
+  }
+
   // the sweep: what the operator actually sets, and the ground it wets
   if(aArc>0.01){
     fxc.setTransform(1,0,0,1,0,0);
@@ -494,7 +529,7 @@ function drawCoverage(g, t, cam){
     for(var j=0;j<TW.length;j++){
       var tj=TW[j], aj=towerAlpha(t,j);
       if(aj<=0.01) continue;
-      var sweep = seq(t, 68.8 + j*0.2, 1.4);
+      var sweep = seq(t, 69.6 + j*0.2, 1.6);
       if(sweep<=0.01) continue;
       any = true;
       // the two stops close in on the recommended window from the full circle
@@ -516,7 +551,7 @@ function drawCoverage(g, t, cam){
     for(var k=0;k<TW.length;k++){
       var tk=TW[k], ak=towerAlpha(t,k);
       if(ak<=0.01) continue;
-      var sw = seq(t, 68.8 + k*0.2, 1.4);
+      var sw = seq(t, 69.6 + k*0.2, 1.6);
       if(sw<=0.01) continue;
       var isShedK = tk.rank > Math.round(shed);
       var dimK = isShedK ? lerp(1,0.18,rk) : 1;

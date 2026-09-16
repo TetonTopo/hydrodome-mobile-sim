@@ -143,80 +143,126 @@ for (;;) {
 console.log('towers placed:', chosen.length, ' spacing',
   chosen.slice(1).map((t,k) => Math.round(t.Y - chosen[k].Y)).join(', '), 'm');
 
-/* ---------------------------------------------- recommended arc window */
+/* ------------------------------------------------ the sweep, optimised
+ * A part-circle gun sweeps one contiguous window between two reverse stops. So the
+ * only free variables per tower are where the window starts and how wide it is —
+ * and those are worth solving, because the ground inside a 50 m circle is not all
+ * worth the same water:
+ *
+ *   a house            the thing we are here for                 +1.00 / m2
+ *   canopy, fine fuel  the fuel that carries fire into it        +0.35 / m2
+ *   pavement, water    nothing to protect, water straight down   -0.60 / m2
+ *   bare ground        same                                      -0.60 / m2
+ *
+ * and ground a neighbour already wets is worth a quarter of its value, so the line
+ * spreads out instead of everybody pointing at the same block. Windows are solved
+ * by coordinate descent: each tower re-picks its best window given what the others
+ * currently cover, repeated until nothing moves.
+ */
 const NS = 36, SEC = 360/NS;
-function sectors(t){
-  const rows = Array.from({length:NS}, (_,s) => ({ a0:s*SEC, n:new Array(8).fill(0), tot:0 }));
-  sampleDisc(t.x, t.Y, THROW, (c, wx, wY, dx, dy) => {
-    if (c < 0) return;
-    let b = Math.atan2(dx, -dy)*180/Math.PI;             // 0 = north, clockwise
-    if (b < 0) b += 360;
-    const r = rows[Math.min(NS-1, (b/SEC)|0)];
-    r.n[c]++; r.tot++;
-  });
-  return rows.map(r => ({ a0:r.a0, structure_m2:r.n[STRUCT]*PX_M2,
-                          waste: r.tot ? (r.n[PAVE]+r.n[WATER]+r.n[BARE])/r.tot : 0, tot:r.tot }));
+const W_STRUCT = 1.00, W_VEG = 0.35, W_WASTE = -0.60, OVERLAP_KEEP = 0.25;
+const SPAN_MIN = 90, SPAN_MAX = 270;                     // real reverse-stop settings
+
+function pixelWorth(c){
+  if (c === STRUCT) return W_STRUCT;
+  if (c === CANOPY || c === FUEL) return W_VEG;
+  if (c === PAVE || c === WATER || c === BARE) return W_WASTE;
+  return 0;                                              // unclassified: no opinion
 }
-// A Nelson part-circle gun sweeps between two reverse stops the operator sets by
-// hand. So the recommendation has to be one continuous window, wide enough to be a
-// real setting and narrow enough to mean something: half a circle, give or take.
-// Pick the window that protects the most structure for the least wasted ground —
-// no capture threshold, no tie-breaks, just one score. That keeps the five towers
-// reading as one family instead of one sliver and one near-circle.
-// One rule, the same for every gun on every site: a Nelson part-circle sweeps the
-// half-circle facing what it is there to protect. The operator sets two reverse
-// stops; there is nothing to optimise and nothing to explain. The span is fixed at
-// 180 deg so the line reads as one system, and the centre is the bearing of the
-// structure the tower actually covers, rounded to the 10 deg the sector table uses.
-// Half the water is off the table by construction, and the half that goes is aimed
-// at buildings rather than at the road and the open ground behind the gun.
-const ARC_SPAN = 180;
-const PROTECTED_BEARING = 90;        // the town side; the fire is out of the west
-const MAX_OFF_AXIS = 70;             // how far the sweep may swing to follow the houses
-function angDiff(x, y){ const d = Math.abs(x-y)%360; return d > 180 ? 360-d : d; }
-function bestArc(rows, total){
-  const L = ARC_SPAN/SEC;
-  let best = null;
-  for (let st = 0; st < NS; st++) {
-    const centre = (st*SEC + ARC_SPAN/2) % 360;
-    // never sweep back into the wildland: the water goes across what is behind you
-    if (angDiff(centre, PROTECTED_BEARING) > MAX_OFF_AXIS) continue;
-    let sSum = 0, wSum = 0, tSum = 0;
-    for (let k = 0; k < L; k++) {
-      const r = rows[(st+k)%NS];
-      sSum += r.structure_m2; wSum += r.waste*r.tot; tSum += r.tot;
-    }
-    if (!best || sSum > best.sSum)
-      best = { start: st*SEC, span: ARC_SPAN, sSum, centre,
-               structure_capture: total > 0 ? sSum/total : 1,
-               waste: tSum ? wSum/tSum : 0 };
-  }
-  return best;
+function bearingOf(dx, dy){
+  let b = Math.atan2(dx, -dy)*180/Math.PI;               // 0 = north, clockwise
+  return b < 0 ? b+360 : b;
+}
+function inWindow(t, wx, wY){
+  if (!t.win) return false;
+  let rel = bearingOf(wx-t.x, wY-t.Y) - t.win.start;
+  if (rel < 0) rel += 360;
+  return rel < t.win.span;
 }
 
-/* --------------------------------------------------- overlap: circle vs arc */
-function inArc(t, wx, wY){
-  let b = Math.atan2(wx-t.x, -(wY-t.Y))*180/Math.PI;
-  if (b < 0) b += 360;
-  let rel = b - t.arc.start;
-  if (rel < 0) rel += 360;
-  return rel <= t.arc.span;
+// every pixel of every tower's disc, bucketed by sector, kept for the whole solve
+const discs = chosen.map(t => {
+  const px = [];
+  sampleDisc(t.x, t.Y, THROW, (c, wx, wY, dx, dy, idx) => {
+    if (c < 0) return;
+    px.push({ idx, wx, wY, cls: c, worth: pixelWorth(c),
+              sec: Math.min(NS-1, (bearingOf(dx, dy)/SEC)|0) });
+  });
+  return px;
+});
+
+function solveWindows(){
+  chosen.forEach(t => { t.win = { start: 0, span: 360 }; });   // start from the circle
+  for (let pass = 0; pass < 6; pass++) {
+    let moved = false;
+    for (let i = 0; i < chosen.length; i++) {
+      const t = chosen[i];
+      // what each of this tower's sectors is worth right now
+      const val = new Array(NS).fill(0);
+      for (const p of discs[i]) {
+        let others = 0;
+        for (let j = 0; j < chosen.length; j++)
+          if (j !== i && Math.hypot(p.wx-chosen[j].x, p.wY-chosen[j].Y) <= THROW
+              && inWindow(chosen[j], p.wx, p.wY)) others++;
+        const share = others ? OVERLAP_KEEP : 1;
+        // waste is waste however many towers hit it; only the credit is shared
+        val[p.sec] += (p.worth > 0 ? p.worth*share : p.worth) * PX_M2;
+      }
+      let best = null;
+      for (let st = 0; st < NS; st++) {
+        let sum = 0;
+        for (let L = 1; L <= NS; L++) {
+          sum += val[(st+L-1)%NS];
+          const span = L*SEC;
+          if (span < SPAN_MIN || span > SPAN_MAX) continue;
+          if (!best || sum > best.score) best = { start: st*SEC, span, score: sum };
+        }
+      }
+      if (!best) best = { start: 0, span: 180, score: 0 };
+      if (!t.win || t.win.start !== best.start || t.win.span !== best.span) moved = true;
+      t.win = best;
+      t.secVal = val;
+    }
+    if (!moved) break;
+  }
 }
-function overlapShare(useArc){
-  const once = new Set(), twice = new Set();
-  for (const t of chosen)
-    sampleDisc(t.x, t.Y, THROW, (c, wx, wY, dx, dy, idx) => {
-      if (useArc && !inArc(t, wx, wY)) return;
-      if (once.has(idx)) twice.add(idx); else once.add(idx);
-    });
-  return { share: twice.size/Math.max(1, once.size), area: once.size*PX_M2 };
+solveWindows();
+
+// per-tower report against the window it ended up with
+function windowStats(i){
+  const t = chosen[i];
+  const n = new Array(8).fill(0);
+  let tot = 0;
+  for (const p of discs[i]) {
+    if (!inWindow(t, p.wx, p.wY)) continue;
+    n[p.cls]++; tot++;
+  }
+  return { tot_m2: tot*PX_M2,
+           structure_m2: n[STRUCT]*PX_M2,
+           veg_m2: (n[CANOPY]+n[FUEL])*PX_M2,
+           waste: tot ? (n[PAVE]+n[WATER]+n[BARE])/tot : 0 };
 }
+
+/* ----------------------------------------- what the circles vs the sweeps cost */
+function ground(useWindow){
+  const once = new Set(), twice = new Set(), byCls = new Array(8).fill(0);
+  chosen.forEach((t, i) => {
+    for (const p of discs[i]) {
+      if (useWindow && !inWindow(t, p.wx, p.wY)) continue;
+      if (once.has(p.idx)) { twice.add(p.idx); continue; }
+      once.add(p.idx); byCls[p.cls]++;
+    }
+  });
+  return { area: once.size*PX_M2, overlap: twice.size/Math.max(1, once.size),
+           structure: byCls[STRUCT]*PX_M2,
+           veg: (byCls[CANOPY]+byCls[FUEL])*PX_M2,
+           waste: (byCls[PAVE]+byCls[WATER]+byCls[BARE])*PX_M2 };
+}
+const gC = ground(false), gW = ground(true);
 
 /* ------------------------------------------------------------- assemble */
 const towers = chosen.map((t, i) => {
-  const rows = sectors(t);
-  const arc = bestArc(rows, t.structure_m2);
-  t.arc = arc;
+  const st = windowStats(i);
   let nb = 0;
   for (const b of S.buildings) {
     const r = b.pts; let cx=0, cY=0;
@@ -224,69 +270,66 @@ const towers = chosen.map((t, i) => {
     const n = Math.max(1, r.length-1);
     if (Math.hypot(cx/n - t.x, cY/n - t.Y) <= THROW) nb++;
   }
+  // sector worth, normalised, so the page can draw why the window sits where it does
+  const peak = Math.max(1, ...t.secVal.map(Math.abs));
   return {
     id: i+1, x: +t.x.toFixed(1), y: +(SH - t.Y).toFixed(1), road: t.road,
     structure_m2: Math.round(t.structure_m2), structures: nb,
-    waste_full: +t.waste.toFixed(3), waste_arc: +arc.waste.toFixed(3),
-    arc: { start: arc.start, span: arc.span, structure_capture: +arc.structure_capture.toFixed(3) },
+    waste_full: +t.waste.toFixed(3), waste_arc: +st.waste.toFixed(3),
+    arc: { start: t.win.start, span: t.win.span },
+    kept: { structure_m2: Math.round(st.structure_m2), veg_m2: Math.round(st.veg_m2),
+            area_m2: Math.round(st.tot_m2) },
     fractions: Object.fromEntries(Object.entries(t.fractions).map(([k,v]) => [k, +v.toFixed(3)])),
-    sectors: rows.map(r => ({ a0:r.a0, s:Math.round(r.structure_m2), w:+r.waste.toFixed(2) }))
+    sectors: t.secVal.map((v, k) => ({ a0: k*SEC, v: +(v/peak).toFixed(3) }))
   };
 });
 
-const ovC = overlapShare(false), ovA = overlapShare(true);
-console.log('\n  id  road                 x      y    struct m2 bldgs  waste   arc         keep   waste(arc)');
-for (const t of towers)
-  console.log('  T'+String(t.id).padEnd(3), t.road.padEnd(18),
-    String(t.x).padStart(6), String(t.y).padStart(7),
-    String(t.structure_m2).padStart(8), String(t.structures).padStart(5),
-    t.waste_full.toFixed(2).padStart(7),
-    (t.arc.start+'\u00b0/'+t.arc.span+'\u00b0').padStart(11),
-    ((t.arc.structure_capture*100).toFixed(0)+'%').padStart(6),
-    t.waste_arc.toFixed(2).padStart(10));
-
-const mf = towers.reduce((a,t)=>a+t.waste_full,0)/towers.length;
-const ma = towers.reduce((a,t)=>a+t.waste_arc,0)/towers.length;
-let covered = 0; { const seen = new Set();
-  for (const t of chosen) sampleDisc(t.x, t.Y, THROW, (c,wx,wY,dx,dy,idx)=>{ if(c===STRUCT) seen.add(idx); });
-  covered = Math.round(seen.size*PX_M2); }
-
-function structureIn(useArc){
-  const seen = new Set();
-  for (const t of chosen)
-    sampleDisc(t.x, t.Y, THROW, (c, wx, wY, dx, dy, idx) => {
-      if (useArc && !inArc(t, wx, wY)) return;
-      if (c === STRUCT) seen.add(idx);
-    });
-  return seen.size*PX_M2;
-}
-const sC = structureIn(false), sA = structureIn(true);
-const effC = sC/ovC.area, effA = sA/ovA.area;
 console.log('');
-console.log('mean wasted share   full circle', mf.toFixed(3), '  half-circle', ma.toFixed(3));
-console.log('double-covered ground (circles)', (ovC.share*100).toFixed(0)+'%');
-console.log('sprayed ground   circles', Math.round(ovC.area), 'm2  ->  arcs', Math.round(ovA.area),
-  'm2  (', Math.round((1-ovA.area/ovC.area)*100)+'% less )');
-console.log('structure wetted  circles', Math.round(sC), 'm2  arcs', Math.round(sA), 'm2  (kept',
-  Math.round(sA/sC*100)+'% )');
-console.log('structure per 1000 m2 sprayed:', (effC*1000).toFixed(0), '->', (effA*1000).toFixed(0),
-  ' (', (effA/effC).toFixed(2)+'x )');
+console.log('  id   x      y     window        ground   structure    veg    waste');
+for (const t of towers)
+  console.log('  T'+String(t.id).padEnd(3),
+    String(t.x).padStart(5), String(t.y).padStart(6),
+    (t.arc.start+'° +'+t.arc.span+'°').padStart(12),
+    (t.kept.area_m2+' m2').padStart(10),
+    (t.kept.structure_m2+' m2').padStart(10),
+    (t.kept.veg_m2+' m2').padStart(9),
+    (Math.round(t.waste_arc*100)+'%').padStart(7));
 
+const pct = (x,y) => Math.round(x/y*100);
+console.log('');
+console.log('                 full circles      optimised sweeps');
+console.log('ground wetted  ', String(Math.round(gC.area)+' m2').padEnd(18),
+            Math.round(gW.area)+' m2  (' + pct(gC.area-gW.area, gC.area) + '% less)');
+console.log('  structure    ', String(Math.round(gC.structure)+' m2').padEnd(18),
+            Math.round(gW.structure)+' m2  (' + pct(gW.structure, gC.structure) + '% kept)');
+console.log('  vegetation   ', String(Math.round(gC.veg)+' m2').padEnd(18),
+            Math.round(gW.veg)+' m2  (' + pct(gW.veg, gC.veg) + '% kept)');
+console.log('  pavement/open', String(Math.round(gC.waste)+' m2').padEnd(18),
+            Math.round(gW.waste)+' m2  (' + pct(gC.waste-gW.waste, gC.waste) + '% dropped)');
+console.log('wasted share   ', String(pct(gC.waste, gC.area)+'%').padEnd(18), pct(gW.waste, gW.area)+'%');
+console.log('double-covered ', String(pct(gC.overlap*100,100)+'%').padEnd(18), pct(gW.overlap*100,100)+'%');
+
+const mf = gC.waste/gC.area, ma = gW.waste/gW.area;
 fs.writeFileSync(__dirname + '/placement.json', JSON.stringify({
   towers,
   line_road: pick.name,
   line_geom: S.roads.filter(rd => (rd.name || '') === pick.name)
                     .map(rd => rd.pts.map(p => [+p[0].toFixed(1), +p[1].toFixed(1)])),
-  sprayed_circles_m2: Math.round(ovC.area),
-  sprayed_arcs_m2: Math.round(ovA.area),
   threat: { from_deg: 270, label: 'west' },
-  overlap_circles: +ovC.share.toFixed(3),
-  overlap_arcs: +ovA.share.toFixed(3),
-  structure_covered_m2: covered,
+  sprayed_circles_m2: Math.round(gC.area),
+  sprayed_arcs_m2: Math.round(gW.area),
+  overlap_circles: +gC.overlap.toFixed(3),
+  overlap_arcs: +gW.overlap.toFixed(3),
+  structure_circles_m2: Math.round(gC.structure),
+  structure_arcs_m2: Math.round(gW.structure),
+  veg_circles_m2: Math.round(gC.veg),
+  veg_arcs_m2: Math.round(gW.veg),
+  waste_circles_m2: Math.round(gC.waste),
+  waste_arcs_m2: Math.round(gW.waste),
+  structure_covered_m2: Math.round(gC.structure),
   mean_waste_full: +mf.toFixed(3),
   mean_waste_arc: +ma.toFixed(3),
-  structure_circles_m2: Math.round(sC),
-  structure_arcs_m2: Math.round(sA),
-  efficiency_gain: +(effA/effC).toFixed(2)
+  efficiency_gain: +((gW.structure/gW.area)/(gC.structure/gC.area)).toFixed(2)
 }, null, 1));
-console.log('\nwrote placement.json');
+console.log('');
+console.log('wrote placement.json');

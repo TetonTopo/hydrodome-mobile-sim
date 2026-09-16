@@ -27,7 +27,7 @@ name except in the footer. The picture carries the detail.
 | 04 | The line | the street highlights, five stations drop **on the road** |
 | 05 | Coverage | 50 m circles bloom, covered structures light up |
 | 06 | Ranking | rank badges; supply drops and the lowest-ranked towers shed |
-| 07 | The sweep | circles collapse to the half each gun actually sweeps |
+| 07 | The sweep | every sector scored, then the stops close onto the ground worth wetting |
 | 08 | The wet line | two towers at a time on rotation, the wetted corridor builds up |
 
 ## How the placement is decided
@@ -44,15 +44,37 @@ network and writes the result into `site.js`. The rules, in order:
 4. **Space by marginal coverage.** Walking south, each station takes the spot that
    adds the most *new* structure per unit of wasted circle, at 45–70 m. That is
    what stops the circles overlapping where they do not need to.
-5. **Set the sweep.** One rule, the same for every gun: **a fixed 180° window,
-   opening across what is behind the line**, placed where it covers the most
-   structure. A Nelson part-circle gun is set by hand with two reverse stops —
-   there is nothing to optimise per tower and nothing to explain. Fixing the span
-   is also what makes the five towers read as one system instead of five
-   unrelated wedges, and it guarantees the water never goes back at the fire.
+5. **Solve the sweep.** A part-circle gun sweeps one contiguous window between two
+   reverse stops, so the free variables per tower are where it starts and how wide
+   it is — and they are worth solving, because the ground inside a circle is not
+   all worth the same water:
 
-Result: **44% less ground wetted for 77% of the structure** the full circles
-reached — about **1.4× the building area per unit of ground sprayed**.
+   | | per m² |
+   |---|---|
+   | a house — the thing we are here for | **+1.00** |
+   | canopy and fine fuel — what carries fire into it | **+0.35** |
+   | pavement, open water, bare ground — nothing to protect | **−0.60** |
+
+   Ground a neighbour already wets is worth a quarter of its value, so the line
+   spreads out instead of everybody pointing at the same block. Windows are solved
+   by coordinate descent — each tower re-picks its best window given what the others
+   currently cover — until nothing moves. Spans land between 90° and 270°, what two
+   reverse stops can actually be set to.
+
+Against the same five towers spraying full circles:
+
+| | full circles | optimised sweeps |
+|---|---|---|
+| ground wetted | 32,010 m² | **25,521 m²** (20% less) |
+| structure in it | 1,797 m² | 1,593 m² (**89% kept**) |
+| vegetation in it | 20,215 m² | 18,412 m² (**91% kept**) |
+| pavement / open ground | 9,120 m² | 4,808 m² (**47% dropped**) |
+| wasted share | 28% | **19%** |
+| double-covered | 23% | **2%** |
+
+The loop shows the scoring before the cut: a ring of 10° sectors around each
+circle, green where the ground is worth wetting and red where it is not, and then
+the stops close onto the green.
 
 "Waste" is pavement, open water and bare ground. Vegetation is neither rewarded
 nor punished at the placement stage — that is the doctrine from the block-out
