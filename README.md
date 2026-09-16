@@ -1,53 +1,65 @@
-# The Moat (formerly HydroDome Mobile) — Deployment Simulator
+# The Moat — Site Analysis
 
-A browser-based deployment/coverage simulator for the HydroDome **mobile
-(trailer-deployed)** wildfire-defense system, by
-[Carmanah Wildfire](https://carmanahwildfire.com).
-
-> **Status: v0 starter.** A clean, mobile-correct foundation that replaces the
-> archived permanent-system sims in
-> [`hydrodome-sim`](https://github.com/TetonTopo/hydrodome-sim). It is a visual
-> tool for the slide deck — animated, not a calibrated engineering model.
+A passive, looping **site-identification and tower-placement film** for the
+[Carmanah Wildfire](https://carmanahwildfire.com) pitch deck. It is a background
+visual: no buttons, no clicking, nothing to explain. Somebody talks over it.
 
 **Live:** https://tetontopo.github.io/hydrodome-mobile-sim/
 
-## What it shows
+> Replaces the interactive deployment/fire-spread simulator that used to live
+> here (Penticton, 16 nodes, ignite button). The URL is unchanged so the deck
+> embed on the "virtual model" slide keeps working.
 
-Mapped on the pilot site (West Fraser Quesnel sawmill, 52.9974°N / -122.5017°W):
+## The loop
 
-- A **forest-edge deployment** at the wildland-urban interface: the fire
-  originates in the forest to the south, the system holds the tree line, and the
-  town to the north is defended proactively (not a town being overrun).
-- **Two trailers** laid along the interface frontage, together feeding **16
-  sprinkler nodes** (8 per trailer) across a wide community-scale wet line —
-  each a 6 m tower with a ~55 m wetted footprint.
-- **Sequential firing** — each trailer runs **4 of its 8 sprinklers at a time**
-  (two interleaved banks, 8 active scene-wide); the active bank cycles on a
-  dwell timer while the full frontage stays wet.
-- Live **nozzle-pressure (~70 PSI setpoint)**, active flow, trailer-tank
-  drawdown, two-pump status, and a ~10% **site-grade / static-lift** note.
-- A **smart-water (weather → fire-weather index)** placeholder — future hook,
-  shown but not modulating.
+~82 seconds, seamless, then it starts over. Camera opens wide on the site and
+pushes in to the line, drifting down it from T1 to T10.
 
-## Why a fresh start (not a fork)
+| | Beat | What is on screen |
+|---|---|---|
+| — | The site | Esri ortho of the deployment area |
+| 01 | Open data | 205 ML building footprints and 53 OSM ways draw in |
+| 02 | Block-out | classified raster wipes across: structure, pavement, water, canopy, fine fuel, bare |
+| 03 | The line | fire line draws along the forest edge, ten stations drop at 40 m |
+| 04 | Coverage | 50 m circles bloom, covered structures light up |
+| 05 | Ranking | rank badges; supply drops 10 → 6 and the lowest-ranked towers shed |
+| 06 | Arc window | circles collapse to the recommended arc; wasted share 23% → 16% |
+| 07 | The wet line | two of ten firing on rotation, the wetted corridor builds up |
 
-The permanent sims bake their assumptions deep into a municipal water-main
-hydraulic model and an all-towers-on / zone-rotation firing model. Retrofitting
-them is a hydraulic-core rewrite touching ~8 functions per file across three
-duplicated lineages. See
-[`hydrodome-sim/MIGRATION-NOTES.md`](https://github.com/TetonTopo/hydrodome-sim/blob/main/MIGRATION-NOTES.md)
-for the full investigation. The **Quesnel** lineage was the leanest engine and
-the named pilot, so it's the reference basis for this rebuild.
+## Where the data comes from
 
-## Tech
+Everything is real, from the **Moat Block-Out v0** demo (Sept 2026, RadGeo for
+Carmanah) — the site-analysis page shown at the Sept 8 engineering meeting.
 
-Single self-contained `index.html` — Leaflet + a small vanilla-JS loop that
-drives the firing sequencer and telemetry. No build step.
+- `assets/imagery.jpg` — Esri World Imagery, 0.39 m, over the Maple Bay box
+- `assets/blockout.png` — the rule-based block-out raster at 0.79 m
+- `site.js` — 205 Microsoft ML footprints with heights, 53 OSM ways, water,
+  parks, the hand-drawn fire line, and the 10 ranked tower candidates with
+  their 36 × 10° sector tables
 
-## Related
+Site is **Maple Bay, North Cowichan BC** (953 × 891 m). It is a demo site chosen
+for houses, streets, shoreline and treed lots — **not a client site**.
 
-- [`hydrodome-mobile-command`](https://github.com/TetonTopo/hydrodome-mobile-command) — mobile SCADA / C2 dashboard.
-- [`hydrodome-sim`](https://github.com/TetonTopo/hydrodome-sim) — archived permanent-system sims.
+Tower ranking is the demo's rule, unchanged: **structure covered first** (m² of
+footprint inside the circle), **least waste second** (share of the circle that is
+bare ground, pavement or water). Vegetation is neither rewarded nor punished.
 
----
-THE MOAT™ · by Carmanah Wildfire
+The camera-coverage-check and thermal-hotspot steps from the original demo are
+**not** included here, because they were simulated and a background loop has no
+room to say so.
+
+## Conventions
+
+The Moat is a **line** of towers — not a ring, a perimeter loop or an enclosure.
+Per-tower coverage is still a "circle".
+
+## Local preview
+
+```
+npx serve -l 4178 .
+```
+
+Or use the `mobile-sim` config in `../.claude/launch.json`.
+
+`window.__moat` exposes `seek(seconds)`, `step(seconds)` and `play()` for
+checking a particular beat. It is inert otherwise.

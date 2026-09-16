@@ -2,405 +2,696 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>The Moat — Deployment Simulator (Penticton)</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Moat — Site Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;600;700&display=swap');
-  * { margin:0; padding:0; box-sizing:border-box; }
-  html,body { height:100%; background:#0d1117; font-family:'Inter',sans-serif; color:#e6edf3; overflow:hidden; }
-  #map { position:absolute; inset:0; background:#0d1117; }
-  #fx { position:absolute; inset:0; z-index:400; pointer-events:none; }
-  .mono { font-family:'JetBrains Mono',monospace; }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#080b0e;color:#e6edf3;
+    font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  #ui{position:absolute;inset:0;pointer-events:none;z-index:5}
+  .mono{font-family:'JetBrains Mono',ui-monospace,monospace}
 
-  .title { position:absolute; top:14px; left:54px; z-index:1000; background:#0d1117dd;
-    border-left:4px solid #db6d28; border-radius:4px; padding:10px 18px; pointer-events:none; }
-  .title .brand { font-family:'JetBrains Mono',monospace; font-weight:700; letter-spacing:3px; color:#39d2c0; font-size:18px; }
-  .title .brand span { color:#db6d28; }
-  .title .sub { font-size:11px; color:#c9d1d9; letter-spacing:1px; margin-top:3px; }
+  /* ---- brand lockup, top left ---- */
+  .brand{position:absolute;top:30px;left:34px;display:flex;align-items:center;gap:14px}
+  .brand .mark{width:5px;height:42px;background:#db6d28;border-radius:3px;box-shadow:0 0 18px #db6d2899}
+  .brand .wd{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:26px;letter-spacing:7px;color:#fff;line-height:1;
+    text-shadow:0 2px 16px rgba(0,0,0,.95)}
+  .brand .wd em{font-style:normal;color:#39d2c0}
+  .brand .sb{font-size:12.5px;letter-spacing:3.4px;text-transform:uppercase;color:#a6b0b8;margin-top:7px;
+    text-shadow:0 2px 12px rgba(0,0,0,.95)}
 
-  .panel { position:absolute; top:14px; right:14px; z-index:1000; width:264px;
-    background:#0d1117ee; border:1px solid #30363d; border-radius:8px; padding:13px; }
-  .panel h3 { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:2px; text-transform:uppercase;
-    color:#7d8590; border-bottom:1px solid #30363d; padding-bottom:5px; margin:11px 0 8px; }
-  .panel h3:first-child { margin-top:0; }
-  .row { display:flex; justify-content:space-between; align-items:center; margin:5px 0; font-size:12px; }
-  .row .k { color:#7d8590; font-family:'JetBrains Mono',monospace; font-size:10px; }
-  .row .v { font-family:'JetBrains Mono',monospace; font-weight:600; }
-  .big { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-  .stat { background:#161b22; border:1px solid #30363d; border-radius:6px; padding:8px; text-align:center; }
-  .stat .l { font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:1px; color:#7d8590; text-transform:uppercase; }
-  .stat .n { font-family:'JetBrains Mono',monospace; font-size:20px; font-weight:700; }
-  .btn { margin-top:10px; width:100%; background:#db6d28; color:#0d1117; border:none; border-radius:6px;
-    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:11px; letter-spacing:1px; padding:9px; cursor:pointer; }
-  .btn.reset { background:#21262d; color:#c9d1d9; border:1px solid #30363d; margin-top:6px; }
+  /* ---- caption block, bottom left ---- */
+  .cap{position:absolute;left:34px;bottom:44px;max-width:46%}
+  .cap .step{font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:4.5px;color:#39d2c0;
+    text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:11px}
+  .cap .step i{display:block;width:26px;height:2px;background:#39d2c0;opacity:.75}
+  .cap h1{font-size:40px;line-height:1.08;font-weight:800;letter-spacing:-.6px;
+    text-shadow:0 3px 26px rgba(0,0,0,.85);margin-bottom:11px}
+  .cap p{font-size:19px;line-height:1.45;color:#c2ccd4;text-shadow:0 2px 16px rgba(0,0,0,.9);max-width:30em}
+  .cap p b{color:#fff;font-weight:600}
+  .fadein{opacity:0;transform:translateY(14px);transition:opacity .55s ease,transform .55s cubic-bezier(.2,.7,.2,1)}
+  .fadein.on{opacity:1;transform:none}
+  html.nofx *{transition:none!important}
 
-  .legend { position:absolute; bottom:22px; left:14px; z-index:1000; background:#0d1117e6; border:1px solid #30363d;
-    border-radius:6px; padding:9px 13px; font-size:10.5px; line-height:1.65; }
-  .legend .sw { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:middle; }
-  .badge { font-size:8px; background:rgba(188,140,255,0.16); color:#bc8cff; padding:1px 6px; border-radius:7px; letter-spacing:1px; }
-  .foot { position:absolute; bottom:3px; right:12px; z-index:1000; font-family:'JetBrains Mono',monospace;
-    font-size:10px; color:rgba(255,255,255,0.5); letter-spacing:2px; }
-  .leaflet-popup-content-wrapper { background:#161b22f2; color:#e6edf3; border:1px solid #db6d28; border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:11px; }
-  .leaflet-popup-tip { background:#161b22f2; }
-  .gun-tag { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; color:#fff; text-shadow:1px 1px 3px #000,-1px -1px 3px #000; white-space:nowrap; }
-  .ok { color:#3fb950; } .warn { color:#d29922; } .crit { color:#f85149; }
+  /* ---- readouts, top right (single flow column so nothing collides) ---- */
+  .rail{position:absolute;top:30px;right:34px;width:252px;text-align:right}
+  .lbl{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:2.6px;color:#8d979f;
+    text-transform:uppercase;margin-bottom:6px;text-shadow:0 2px 10px rgba(0,0,0,.9)}
+  .grp{margin-bottom:16px;opacity:0;transition:opacity .5s ease}
+  .grp.on{opacity:1}
+  .num{font-family:'JetBrains Mono',monospace;font-size:34px;font-weight:700;line-height:1;color:#fff;
+    text-shadow:0 2px 14px rgba(0,0,0,.95)}
+  .num u{text-decoration:none;font-size:15px;color:#96a0a8;margin-left:5px;letter-spacing:1px}
+  .num.teal{color:#39d2c0}
+
+  /* ---- class bars ---- */
+  .classes{margin-top:2px;opacity:0;transition:opacity .6s ease}
+  .classes.on{opacity:1}
+  .cl{display:grid;grid-template-columns:1fr 96px;gap:10px;align-items:center;margin-bottom:6px}
+  .cl .bw{height:10px;background:#00000066;border:1px solid #ffffff1f;border-radius:2px;overflow:hidden}
+  .cl .bw i{display:block;height:100%;width:0;border-radius:1px;transition:width 1.4s cubic-bezier(.2,.7,.2,1)}
+  .cl .t{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#c3cdd4;text-align:left;letter-spacing:.3px;
+    white-space:nowrap;text-shadow:0 2px 8px rgba(0,0,0,.95)}
+  .cl .t b{color:#7f8990;font-weight:400;margin-left:4px}
+
+  /* ---- tower ledger, lower right ---- */
+  .ledger{position:absolute;right:34px;bottom:44px;width:252px;opacity:0;transition:opacity .6s ease}
+  .ledger.on{opacity:1}
+  .lg{display:grid;grid-template-columns:34px 1fr 54px;gap:9px;align-items:center;margin-bottom:6px;
+    font-family:'JetBrains Mono',monospace;font-size:12px;transition:opacity .45s ease;
+    text-shadow:0 2px 8px rgba(0,0,0,.95)}
+  .lg .id{color:#39d2c0;font-weight:700}
+  .lg .v{text-align:right;color:#c9d1d9}
+  .lg .bw{height:8px;background:#ffffff12;border-radius:2px;overflow:hidden;display:flex}
+  .lg .bw i{display:block;height:100%;transition:width .9s cubic-bezier(.2,.7,.2,1)}
+  .lg.shed{opacity:.28}
+  .lg.shed .id{color:#f85149}
+
+  /* ---- footer + progress ---- */
+  .foot{position:absolute;left:34px;bottom:19px;font-family:'JetBrains Mono',monospace;font-size:10.5px;
+    letter-spacing:2.6px;color:#57616a;text-transform:uppercase}
+  .prog{position:absolute;left:0;right:0;bottom:0;height:2px;background:#ffffff12}
+  .prog i{display:block;height:100%;background:linear-gradient(90deg,#39d2c0,#db6d28);width:0}
+
+  @media (max-width:900px){
+    .brand .wd{font-size:20px;letter-spacing:5px}
+    .cap h1{font-size:27px}.cap p{font-size:15px}.cap{max-width:64%}
+    .classes,.ledger{display:none}
+  }
 </style>
 </head>
 <body>
-<div id="map"></div>
-<canvas id="fx"></canvas>
+<canvas id="c"></canvas>
 
-<div class="title">
-  <div class="brand">HYDRO<span>DOME</span> · MOBILE SIM</div>
-  <div class="sub">Forest-edge line defense — wildland-urban interface, Penticton BC</div>
-</div>
-
-<div class="panel">
-  <h3>Structures</h3>
-  <div class="big">
-    <div class="stat"><div class="l">In frame</div><div class="n" style="color:#c9d1d9" id="sTot">—</div></div>
-    <div class="stat"><div class="l">Under cover</div><div class="n ok" id="sCov">—</div></div>
-  </div>
-  <div class="big" style="margin-top:8px">
-    <div class="stat"><div class="l">Protected</div><div class="n ok" id="sSafe">—</div></div>
-    <div class="stat"><div class="l">Lost</div><div class="n crit" id="sLost">0</div></div>
+<div id="ui">
+  <div class="brand">
+    <div class="mark"></div>
+    <div>
+      <div class="wd">THE <em>MOAT</em></div>
+      <div class="sb">Site analysis &middot; block-out v0</div>
+    </div>
   </div>
 
-  <h3>Firing Sequencer · 4 / trailer</h3>
-  <div class="row"><span class="k">T1 firing</span><span class="v crit" id="sA">A1 A3 A5 A7</span></div>
-  <div class="row"><span class="k">T2 firing</span><span class="v crit" id="sB">B1 B3 B5 B7</span></div>
-  <div class="row"><span class="k">Wet line</span><span class="v ok">HELD · 16-node frontage</span></div>
+  <div class="rail">
+    <div class="grp" id="g1">
+      <div class="lbl">Deployment site</div>
+      <div class="num" id="n1">953 <u>&times; 891 m</u></div>
+    </div>
+    <div class="grp" id="g2">
+      <div class="lbl">Structures mapped</div>
+      <div class="num" id="n2">0</div>
+    </div>
+    <div class="grp" id="g3">
+      <div class="lbl" id="l3">Structure under cover</div>
+      <div class="num teal" id="n3">0 <u>m&sup2;</u></div>
+    </div>
+    <div class="classes" id="cls">
+      <div class="lbl">Block-out &middot; 0.79 m raster</div>
+    </div>
+  </div>
 
-  <h3>Deployment · 2 trailers</h3>
-  <div class="row"><span class="k">Sprinklers</span><span class="v">16 total · 8 / trailer</span></div>
-  <div class="row"><span class="k">Firing now</span><span class="v crit">8 active · 4 / trailer</span></div>
-  <div class="row"><span class="k">Frontage / run</span><span class="v">4″ · ≤300 m</span></div>
-  <div class="row"><span class="k">Longest run</span><span class="v" id="sRun">295 m</span> <span class="v ok" id="sSpec">✓ in spec</span></div>
+  <div class="ledger" id="led">
+    <div class="lbl" id="ledlbl">Tower ledger &middot; structure / waste</div>
+  </div>
 
-  <h3>Hydraulics &amp; Fire</h3>
-  <div class="row"><span class="k">Nozzle pressure</span><span class="v" style="color:#39d2c0"><span id="sPsi">70</span> PSI · SP 70</span></div>
-  <div class="row"><span class="k">Active flow</span><span class="v crit"><span id="sFlow">400</span> GPM</span></div>
-  <div class="row"><span class="k">Trailer tank</span><span class="v"><span id="sTank">64</span>% · 6,000 gal</span></div>
-  <div class="row"><span class="k">Wind</span><span class="v warn" id="sWind">SSW 24 km/h</span></div>
-  <div class="row"><span class="k">Fire status</span><span class="v" id="sFire">— ignition pending</span></div>
-  <h3>Smart water <span class="badge">FUTURE</span></h3>
-  <div class="row"><span class="k">WX → fire-wx index</span><span class="v" style="color:#7d8590">not modulating</span></div>
+  <div class="cap">
+    <div class="step fadein" id="cstep"><i></i><span></span></div>
+    <h1 class="fadein" id="chead"></h1>
+    <p class="fadein" id="cbody"></p>
+  </div>
 
-  <button class="btn" id="igniteBtn">▶ IGNITE / RUN FIRE</button>
-  <button class="btn reset" id="resetBtn">↺ RESET</button>
+  <div class="foot">The Moat&trade; &middot; Carmanah Wildfire &middot; Maple Bay, North Cowichan BC</div>
+  <div class="prog"><i id="prog"></i></div>
 </div>
 
-<div class="legend">
-  <div><span class="sw" style="background:rgba(16,40,24,.85)"></span>Forest / wildland fuel&nbsp; <span class="sw" style="background:rgba(150,138,92,.4)"></span>Defensible buffer</div>
-  <div><span class="sw" style="background:rgba(57,210,192,.35);border:1px solid #39d2c0"></span>Structure under Moat cover</div>
-  <div><span class="sw" style="background:rgba(88,166,255,.45)"></span>Wetted frontage / wet line (~55 m)</div>
-  <div><span class="sw" style="background:#f85149"></span>Active fire front &nbsp;<span class="sw" style="background:#3a2218"></span>Burned</div>
-</div>
-<div class="foot">THE MOAT™ · CARMANAH WILDFIRE</div>
-
-<script src="buildings.js"></script>
+<script src="site.js"></script>
 <script>
 (function(){
-  var SITE=[49.4902,-119.5892];
-  var map=L.map('map',{center:SITE,zoom:16,zoomControl:true,attributionControl:true,preferCanvas:true});
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    {maxZoom:19, opacity:0.5, attribution:'Imagery © Esri, Maxar · The Moat'}).addTo(map);
+"use strict";
+var S = window.SITE;
+var SW = S.site.width_m, SH = S.site.height_m;
+var THROW = S.throw;                       // 50 m
+var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // ---------- geometry helpers ----------
-  var COSLAT=Math.cos(SITE[0]*Math.PI/180);
-  function offM(ll, dE, dN){ return [ ll[0] + dN/111320, ll[1] + dE/(111320*COSLAT) ]; }
-  function metersBetween(a,b){ var dN=(a[0]-b[0])*111320, dE=(a[1]-b[1])*111320*COSLAT; return Math.hypot(dN,dE); }
-
-  // ---------- building-avoidance (place guns on streets, not on rooftops) ----------
-  var RAW=window.BUILDINGS||[];
-  function pointInPoly(pt, ring){
-    var x=pt[1], y=pt[0], inside=false;
-    for(var i=0,j=ring.length-1;i<ring.length;j=i++){
-      var xi=ring[i][1], yi=ring[i][0], xj=ring[j][1], yj=ring[j][0];
-      if(((yi>y)!=(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi)) inside=!inside;
+/* ---------------------------------------------------------------- utils */
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+function lerp(a,b,t){ return a+(b-a)*t; }
+function smooth(t){ t=clamp(t,0,1); return t*t*(3-2*t); }
+// progress of a sub-animation starting at t0 running for d seconds
+function seq(t,t0,d){ return smooth((t-t0)/d); }
+// keyframe track: kfs = [[time,value],...]
+function track(t,kfs){
+  if(t<=kfs[0][0]) return kfs[0][1];
+  for(var i=1;i<kfs.length;i++){
+    if(t<=kfs[i][0]){
+      var a=kfs[i-1], b=kfs[i];
+      return lerp(a[1],b[1],smooth((t-a[0])/(b[0]-a[0])));
     }
-    return inside;
   }
-  // nudge a candidate point to the nearest open gap (street/yard), staying near the spec position
-  function findStreet(spec){
-    var L=RAW.filter(function(b){ return metersBetween(spec,b.c)<95; });
-    if(!L.length) return spec;
-    function inside(ll){ for(var i=0;i<L.length;i++){ if(pointInPoly(ll,L[i].r)) return true; } return false; }
-    function clr(ll){ var m=999; for(var i=0;i<L.length;i++){ var d=metersBetween(ll,L[i].c); if(d<m)m=d; } return m; }
-    var best=null, bestD=1e9, fb=spec, fbc=-1;
-    for(var dN=-8; dN<=34; dN+=2){
-      for(var dE=-24; dE<=24; dE+=2){
-        var cand=offM(spec,dE,dN);
-        if(inside(cand)) continue;            // never on a footprint
-        var c=clr(cand);
-        if(c>fbc){ fbc=c; fb=cand; }
-        if(c>=9){ var d=Math.hypot(dE,dN-12); if(d<bestD){ bestD=d; best=cand; } } // a real gap, nearest to spec
+  return kfs[kfs.length-1][1];
+}
+function fy(y){ return SH - y; }           // world metres -> screen-down metres
+
+/* ------------------------------------------------------------- geometry */
+// flip every polyline / polygon once, up front
+function flipRing(r){ var o=new Array(r.length); for(var i=0;i<r.length;i++) o[i]=[r[i][0],fy(r[i][1])]; return o; }
+
+var BLD = S.buildings.map(function(b){
+  var r = flipRing(b.pts), cx=0, cy=0;
+  for(var i=0;i<r.length-1;i++){ cx+=r[i][0]; cy+=r[i][1]; }
+  var n = Math.max(1,r.length-1);
+  return { r:r, c:[cx/n,cy/n], h:b.height||4.5, area:b.area, cov:false, tw:-1 };
+});
+var ROADS = S.roads.map(function(r){ return { cls:r.cls, pts:flipRing(r.pts) }; });
+var WATER = flipRing(S.water);
+var WOODS = S.woods.map(flipRing);
+var GRASS = S.grass.map(flipRing);
+var LINE  = flipRing(S.fire_line);
+
+var TW = S.towers.map(function(t){
+  return { id:t.id, x:t.x, y:fy(t.y), arc:t.arc, sectors:t.sectors,
+           structure_m2:t.structure_m2, waste:t.waste_full, wasteArc:t.waste_arc,
+           structures:t.structures||0 };
+});
+// rank: structure covered first, least waste second (the demo's lexicographic rule)
+var RANKED = TW.slice().sort(function(a,b){
+  if(b.structure_m2!==a.structure_m2) return b.structure_m2-a.structure_m2;
+  return a.waste-b.waste;
+});
+RANKED.forEach(function(t,i){ t.rank=i+1; });
+var MAX_STRUCT = RANKED[0].structure_m2 || 1;
+var MEAN_WASTE_FULL = TW.reduce(function(a,t){ return a+t.waste; },0)/TW.length;
+var MEAN_WASTE_ARC  = TW.reduce(function(a,t){ return a+t.wasteArc; },0)/TW.length;
+
+// which buildings sit inside which tower circle
+var TOTAL_COV_M2 = 0;
+BLD.forEach(function(b){
+  var best=-1, bd=1e9;
+  for(var i=0;i<TW.length;i++){
+    var d = Math.hypot(b.c[0]-TW[i].x, b.c[1]-TW[i].y);
+    if(d<=THROW && d<bd){ bd=d; best=i; }
+  }
+  if(best>=0){ b.cov=true; b.tw=best; TOTAL_COV_M2 += b.area; }
+});
+
+// stable pseudo-random draw order for the footprint reveal
+BLD.forEach(function(b,i){ b.k = ((i*2654435761)%1000)/1000; });
+
+/* --------------------------------------------------------------- canvas */
+var cv = document.getElementById('c'), ctx = cv.getContext('2d');
+var W=0, H=0, DPR=1;
+// the wetted line accumulates on its own layer, anchored to the SITE (not the screen)
+// so it stays put while the camera drifts
+var wet = document.createElement('canvas'), wctx = wet.getContext('2d');
+var WET_K = 1600/SW;                       // wet-layer pixels per metre
+wet.width  = Math.round(SW*WET_K);
+wet.height = Math.round(SH*WET_K);
+function clearWet(){ wctx.setTransform(1,0,0,1,0,0); wctx.clearRect(0,0,wet.width,wet.height); }
+
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
+}
+window.addEventListener('resize', resize);
+
+/* ------------------------------------------------------------- imagery */
+var imgOrtho = new Image(), imgBlk = new Image(), ready=0;
+imgOrtho.onload = imgBlk.onload = function(){ ready++; };
+imgOrtho.src = 'assets/imagery.jpg';
+imgBlk.src   = 'assets/blockout.png';
+
+/* -------------------------------------------------------------- camera */
+var TARGET_W = 900;                        // world metres across the frame at z = 1
+function camera(t){
+  // wide on the site, pushing in to the line once the stations drop
+  var z  = REDUCED ? 1.05 : track(t,[[0,1.00],[18,1.06],[30,1.14],[40,1.60],[52,1.62],[66,1.66],[78,1.60],[81,1.06],[LOOP,1.00]]);
+  var cx = track(t,[[0,470],[18,450],[30,430],[40,292],[52,290],[66,288],[78,292],[81,455],[LOOP,470]]);
+  // during the tower beats the camera drifts slowly down the line, T1 through T10
+  var cy = track(t,[[0,300],[18,300],[30,290],[40,205],[52,255],[66,305],[78,330],[81,300],[LOOP,300]]);
+  var s  = Math.max(W/TARGET_W, H/SH) * z;
+  var vw = W/s, vh = H/s;                  // visible world box
+  cx = vw>=SW ? SW/2 : clamp(cx, vw/2, SW-vw/2);
+  cy = vh>=SH ? SH/2 : clamp(cy, vh/2, SH-vh/2);
+  return { s:s, cx:cx, cy:cy };
+}
+function applyCam(c,g){
+  g.setTransform(DPR,0,0,DPR,0,0);
+  g.translate(W/2,H/2); g.scale(c.s,c.s); g.translate(-c.cx,-c.cy);
+}
+
+/* ------------------------------------------------------------ the film */
+var LOOP = 82;                             // seconds, seamless
+var SCENES = [
+  { t:0.6,  step:'The site',      head:'A deployment site, as the truck sees it',
+    body:'Maple Bay, North Cowichan &mdash; <b>953 &times; 891 m</b> of wildland-urban interface. A map, a rough idea of where fire comes from, and the operator&rsquo;s own eyes.' },
+  { t:10,   step:'Step 01 &middot; Open data', head:'Most of the answer already exists, for free',
+    body:'<b>205 ML building footprints</b> with height estimates, <b>53 OSM ways</b>, water and parks. Nothing flown, nothing bought.' },
+  { t:21,   step:'Step 02 &middot; Block-out', head:'Every pixel gets a class',
+    body:'Structure, pavement, water, canopy, fine fuel, bare ground &mdash; classified at <b>0.79 m</b>, vectors authoritative where they exist.' },
+  { t:32,   step:'Step 03 &middot; The line', head:'The operator draws the line. Stations fall out.',
+    body:'Ten stations at <b>40 m</b> along the forest edge, each throwing about <b>50 m</b>. The Moat is a line, not a ring.' },
+  { t:43,   step:'Step 04 &middot; Coverage', head:'What is actually inside each circle',
+    body:'Square metres of footprint covered, and the share of the circle spent on bare ground, pavement and water.' },
+  { t:54,   step:'Step 05 &middot; Ranking', head:'Structure first. Least waste second.',
+    body:'When the intake cannot feed all ten, the towers covering the least shed first &mdash; <b>by what they protect</b>, not by position.' },
+  { t:64,   step:'Step 06 &middot; Arc window', head:'Water only where the circle earns it',
+    body:'A recommended arc per tower keeps <b>95%+ of the structure</b> and drops the wasted share by roughly half.' },
+  { t:73,   step:'Step 07 &middot; The wet line', head:'One in five towers, every ten minutes',
+    body:'Two of ten firing at a time on a rotating duty cycle. The line stays wet on a fraction of the water.' }
+];
+
+var els = {
+  step: document.querySelector('#cstep span'), stepBox: document.getElementById('cstep'),
+  head: document.getElementById('chead'), body: document.getElementById('cbody'),
+  n2: document.getElementById('n2'), n3: document.getElementById('n3'), l3: document.getElementById('l3'),
+  g1: document.getElementById('g1'), g2: document.getElementById('g2'), g3: document.getElementById('g3'),
+  cls: document.getElementById('cls'), led: document.getElementById('led'),
+  ledlbl: document.getElementById('ledlbl'), prog: document.getElementById('prog')
+};
+
+/* class bars + tower ledger are DOM, built once */
+var CLASS_COLOR = { canopy:'#2a7a44', water:'#3878c8', bare:'#b9a98e', pavement:'#8f9499',
+                    fine_fuel:'#d2ad3f', structure:'#e24b33', unknown:'#c9c9c9' };
+var CLASS_NAME  = { canopy:'canopy', water:'water', bare:'bare', pavement:'pavement',
+                    fine_fuel:'fine fuel', structure:'structure', unknown:'unclassified' };
+var clsBars = [];
+Object.keys(S.class_pct).sort(function(a,b){ return S.class_pct[b]-S.class_pct[a]; }).forEach(function(k){
+  var row = document.createElement('div'); row.className='cl';
+  row.innerHTML = '<div class="bw"><i style="background:'+CLASS_COLOR[k]+'"></i></div>'+
+                  '<div class="t">'+CLASS_NAME[k]+'<b>'+S.class_pct[k].toFixed(0)+'%</b></div>';
+  els.cls.appendChild(row);
+  clsBars.push({ el: row.querySelector('i'), pct: S.class_pct[k] });
+});
+var ledRows = RANKED.map(function(t){
+  var row = document.createElement('div'); row.className='lg';
+  row.innerHTML = '<div class="id">T'+t.id+'</div>'+
+    '<div class="bw"><i style="background:#39d2c0"></i><i style="background:#f85149"></i></div>'+
+    '<div class="v">'+(t.structure_m2?Math.round(t.structure_m2).toLocaleString():'&mdash;')+'</div>';
+  els.led.appendChild(row);
+  var bars = row.querySelectorAll('i');
+  return { el:row, t:t, sBar:bars[0], wBar:bars[1] };
+});
+
+var lastScene = -1, barsFilled = false, ledgerFilled = false;
+function setScene(i){
+  if(i===lastScene) return;
+  lastScene = i;
+  var s = SCENES[i];
+  [els.stepBox, els.head, els.body].forEach(function(e){ e.classList.remove('on'); });
+  setTimeout(function(){
+    if(lastScene!==i) return;
+    els.step.innerHTML = s.step; els.head.innerHTML = s.head; els.body.innerHTML = s.body;
+    els.stepBox.classList.add('on');
+    setTimeout(function(){ if(lastScene===i) els.head.classList.add('on'); }, 90);
+    setTimeout(function(){ if(lastScene===i) els.body.classList.add('on'); }, 190);
+  }, 260);
+}
+
+/* ------------------------------------------------------------- drawing */
+function ring(g, r, close){
+  g.beginPath(); g.moveTo(r[0][0], r[0][1]);
+  for(var i=1;i<r.length;i++) g.lineTo(r[i][0], r[i][1]);
+  if(close) g.closePath();
+}
+function drawImageLayer(g, im, a){
+  if(a<=0.002 || !im.complete || !im.naturalWidth) return;
+  g.globalAlpha = a; g.drawImage(im, 0, 0, SW, SH); g.globalAlpha = 1;
+}
+
+function drawVectors(g, t, cam){
+  var reveal = seq(t, 10, 3.4);                    // footprints + roads draw in
+  var aVec   = track(t,[[9.6,0],[12,1],[20,1],[24,0.5],[30,0.42],[79,0.42],[81.5,0]]);
+  if(aVec<=0.002) return;
+  var px = 1/cam.s;                                 // one screen pixel in world metres
+
+  // water + parks, a quiet wash under everything
+  g.globalAlpha = aVec*0.5;
+  g.fillStyle='#1b4f86'; ring(g,WATER,true); g.fill();
+  g.fillStyle='#24532f'; WOODS.concat(GRASS).forEach(function(r){ ring(g,r,true); g.fill(); });
+
+  // roads
+  g.globalAlpha = aVec*0.85*reveal;
+  g.strokeStyle='#9fb0bd'; g.lineCap='round'; g.lineJoin='round';
+  ROADS.forEach(function(r,i){
+    var f = clamp(reveal*1.6 - (i/ROADS.length)*0.5, 0, 1);
+    if(f<=0.01) return;
+    g.lineWidth = (r.cls==='tertiary'?3.4:r.cls==='residential'?2.4:1.5)*px*1.35;
+    g.globalAlpha = aVec*0.85*f;
+    ring(g,r.pts,false); g.stroke();
+  });
+
+  // footprints, staggered by a stable hash so they pop in as a field
+  g.lineWidth = 1.35*px;
+  for(var i=0;i<BLD.length;i++){
+    var b = BLD[i];
+    var f = clamp(reveal*1.9 - b.k*0.85, 0, 1);
+    if(f<=0.01) continue;
+    var lit = b.cov ? track(t,[[43,0],[46,1],[79,1],[81.5,0]]) : 0;
+    g.globalAlpha = aVec*f;
+    ring(g, b.r, true);
+    g.fillStyle = lit>0.02 ? 'rgba(57,210,192,'+(0.20+0.30*lit)+')' : 'rgba(226,75,51,0.30)';
+    g.fill();
+    g.strokeStyle = lit>0.02 ? 'rgba(120,255,238,'+(0.55+0.4*lit)+')' : 'rgba(255,150,120,0.55)';
+    g.stroke();
+  }
+  g.globalAlpha = 1;
+}
+
+function drawFireLine(g, t, cam){
+  var a = track(t,[[31.4,0],[33.5,1],[79,1],[81.5,0]]);
+  if(a<=0.002) return;
+  var px = 1/cam.s;
+  var grow = seq(t, 31.6, 2.2);
+
+  // partial polyline by arc length
+  var total=0, segs=[];
+  for(var i=1;i<LINE.length;i++){
+    var d = Math.hypot(LINE[i][0]-LINE[i-1][0], LINE[i][1]-LINE[i-1][1]);
+    segs.push(d); total+=d;
+  }
+  var want = total*grow, acc=0;
+  g.beginPath(); g.moveTo(LINE[0][0], LINE[0][1]);
+  for(var j=1;j<LINE.length;j++){
+    var d=segs[j-1];
+    if(acc+d<=want){ g.lineTo(LINE[j][0], LINE[j][1]); acc+=d; }
+    else { var f=(want-acc)/d;
+      g.lineTo(lerp(LINE[j-1][0],LINE[j][0],f), lerp(LINE[j-1][1],LINE[j][1],f)); break; }
+  }
+  g.globalAlpha = a;
+  g.lineCap='round'; g.lineJoin='round';
+  g.strokeStyle='rgba(219,109,40,0.16)'; g.lineWidth = 34*px; g.stroke();
+  g.strokeStyle='rgba(219,109,40,0.34)'; g.lineWidth = 15*px; g.stroke();
+  g.strokeStyle='#ff8c3a';               g.lineWidth = 4.2*px; g.stroke();
+  // threat-side ticks, pointing west into the wildland
+  g.lineWidth = 2.2*px; g.strokeStyle='rgba(255,140,58,0.75)';
+  for(var k=0;k<LINE.length-1;k++){
+    for(var u=0;u<5;u++){
+      var f=(u+0.5)/5;
+      var x=lerp(LINE[k][0],LINE[k+1][0],f), y=lerp(LINE[k][1],LINE[k+1][1],f);
+      if(Math.hypot(x-LINE[0][0], y-LINE[0][1]) > want+40) continue;
+      g.beginPath(); g.moveTo(x,y); g.lineTo(x-20, y-8); g.stroke();
+    }
+  }
+  g.globalAlpha = 1;
+}
+
+// bearing (0 = north, clockwise) -> canvas angle in screen-down space
+function bear(d){ return (d-90)*Math.PI/180; }
+
+function towerAlpha(t,i){
+  var t0 = 34.2 + i*0.42;                 // stations drop in sequence
+  return track(t,[[t0,0],[t0+0.6,1],[79,1],[81.5,0]]);
+}
+
+function drawCoverage(g, t, cam){
+  var px = 1/cam.s;
+  var aCirc = track(t,[[42.6,0],[45,1],[62,1],[65.5,0]]);        // full circles
+  var aArc  = track(t,[[63.5,0],[66.5,1],[79,1],[81.5,0]]);        // recommended arcs
+  var shed  = track(t,[[54.5,10],[59,6],[62.5,6],[64,10]]);      // supply slider 10 -> 6 -> 10
+  var rankOn= track(t,[[53.5,0],[56,1],[63,1],[65,0]]);
+
+  for(var i=0;i<TW.length;i++){
+    var tw=TW[i], a=towerAlpha(t,i);
+    if(a<=0.01) continue;
+    var isShed = tw.rank > Math.round(shed);
+    var dim = isShed ? lerp(1, 0.18, rankOn) : 1;
+
+    // full circle
+    if(aCirc>0.01){
+      var bloom = seq(t, 42.8 + i*0.16, 1.1);
+      var r = THROW*bloom;
+      g.globalAlpha = aCirc*a*dim;
+      g.beginPath(); g.arc(tw.x,tw.y,r,0,Math.PI*2);
+      g.fillStyle='rgba(57,210,192,0.13)'; g.fill();
+      g.strokeStyle='rgba(6,16,19,0.55)'; g.lineWidth=5.0*px; g.stroke();
+      g.strokeStyle='rgba(112,247,231,0.95)'; g.lineWidth=2.2*px; g.stroke();
+      // expanding ping as it blooms
+      if(bloom<1){
+        g.globalAlpha = aCirc*a*dim*(1-bloom);
+        g.beginPath(); g.arc(tw.x,tw.y, r*1.12, 0, Math.PI*2);
+        g.strokeStyle='rgba(180,255,246,0.9)'; g.lineWidth=2.6*px; g.stroke();
       }
     }
-    return best||fb;
-  }
-
-  // ---------- deployment (two trailers · forest-edge frontage) ----------
-  var SPEC={ maxRun:300, cover:55 };
-  var FRONT_LAT=49.48670;                         // the wildland-urban interface line (forest edge) — town to the north, wildland to the south
-  var FRONT=[FRONT_LAT,-119.5892];
-  // two trailers, spaced along the frontage for a coordinated, community-scale defense
-  var trailers=[
-    {id:'T1', side:'A', ll:offM(FRONT,-190,-8)},  // west trailer, just inside the defensible line
-    {id:'T2', side:'B', ll:offM(FRONT, 190,-8)}   // east trailer
-  ];
-  // 16 sprinklers total — 8 per trailer — laid as a continuous interface frontage.
-  // Each trailer feeds its own half of the line; alternating banks (4 of 8) fire at a time.
-  var guns=[]; // {id, trailer, side, ll, run, bank}
-  var NSPR=16, SPAN=690, X0=-SPAN/2, STEP=SPAN/NSPR;   // ~43 m spacing across the frontage
-  for(var i=0;i<NSPR;i++){
-    var E=X0+STEP*(i+0.5);                         // -323 .. +323 m
-    var ti=i<8?0:1;                                // first 8 -> west trailer, next 8 -> east
-    var t=trailers[ti];
-    var spec=offM(FRONT,E,6);                       // a touch north of the line, throwing south into the wildland
-    var gunLL=findStreet(spec);                     // snap to open ground / street if near a footprint
-    var run=Math.abs(E-(ti?190:-190))+8;            // hose run from the owning trailer
-    guns.push({id:t.side+((i%8)+1), trailer:ti, side:t.side, ll:gunLL, bank:(i%2), run:run});
-  }
-  var longestRun=Math.max.apply(null,guns.map(function(g){return g.run;}));
-  document.getElementById('sRun').textContent=Math.round(longestRun)+' m';
-  var inSpec=longestRun<=SPEC.maxRun;
-  document.getElementById('sSpec').textContent=inSpec?'✓ in spec':'✗ OVER SPEC';
-  document.getElementById('sSpec').className='v '+(inSpec?'ok':'crit');
-
-  // latitude of the defensive frontage (separates the protected town from the wildland)
-  var LINE_LAT=FRONT_LAT;
-
-  // ---------- markers ----------
-  trailers.forEach(function(t){
-    L.marker(t.ll,{icon:L.divIcon({className:'',html:'<div style="background:#39d2c0;border:2px solid #fff;border-radius:3px;width:18px;height:12px"></div>',iconSize:[18,12],iconAnchor:[9,6]})})
-      .addTo(map).bindPopup('<b style="color:#39d2c0">MOBILE TRAILER '+t.id+'</b><br>2 pumps (P1 lead / P2 standby)<br>8 sprinklers · 4 firing at a time<br>6,000 gal tank · LoRa GW 915 MHz');
-    L.marker(t.ll,{icon:L.divIcon({className:'',html:'<div class="gun-tag" style="color:#39d2c0">▣ '+t.id+'</div>',iconSize:[80,14],iconAnchor:[-12,7]})}).addTo(map);
-  });
-  // trunk line: each trailer along its half of the sprinkler frontage
-  trailers.forEach(function(t,ti){
-    var pts=[t.ll].concat(guns.filter(function(g){return g.trailer===ti;}).map(function(g){return g.ll;}));
-    L.polyline(pts,{color:'#2ea043',weight:3,opacity:0.6}).addTo(map);
-  });
-  guns.forEach(function(g){
-    g.dot=L.circleMarker(g.ll,{radius:6,color:'#fff',weight:1.5,fillColor:'#3fb950',fillOpacity:0.95,pane:'markerPane'}).addTo(map);
-    g.dot.bindPopup('<b style="color:#db6d28">SPRINKLER '+g.id+'</b> · '+trailers[g.trailer].id+
-      '<br>6 m tower · ~55 m throw · hose run '+Math.round(g.run)+' m<br>~200 GPM @ 70 PSI · LoRa node (valve+batt)');
-    L.marker(g.ll,{icon:L.divIcon({className:'',html:'<div class="gun-tag">'+g.id+'</div>',iconSize:[26,14],iconAnchor:[-7,7]})}).addTo(map);
-  });
-
-  // ---------- buildings ----------
-  var BLD=(window.BUILDINGS||[]).map(function(b){
-    var covered = guns.some(function(g){ return metersBetween(g.ll,b.c)<=SPEC.cover; });
-    var north = b.c[0] >= LINE_LAT;            // behind the wet line (protected side)
-    return { c:b.c, r:b.r, covered:covered, north:north, state: covered?'cov':(north?'safe':'risk') };
-  });
-  document.getElementById('sTot').textContent=BLD.length;
-
-  // ---------- fire grid ----------
-  var CELL=7; // metres
-  var halfW=380, south=200, north=150;
-  var cols=Math.ceil((halfW*2)/CELL), rows=Math.ceil((south+north)/CELL);
-  var originLL=offM(FRONT,-halfW,-south); // SW corner — grid runs from deep wildland (south) to town (north)
-  function cellLL(r,c){ return offM(originLL, c*CELL+CELL/2, r*CELL+CELL/2); }
-  // wetted mask: within cover of ANY sprinkler => the held frontage the fire cannot cross
-  var wet=new Uint8Array(rows*cols), state=new Uint8Array(rows*cols), life=new Uint8Array(rows*cols);
-  for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
-    var ll=cellLL(r,c);
-    for(var i=0;i<guns.length;i++){ if(metersBetween(guns[i].ll,ll)<=SPEC.cover){ wet[r*cols+c]=1; break; } }
-  }
-
-  // ---------- forest / wildland canopy (south of the frontage) ----------
-  // a ragged tree line begins south of the wet line, then dense canopy runs down to the grid's south edge
-  var FOREST_TOP=-34;                              // m N of the frontage where the canopy begins (south of the wet line)
-  var fEdge=new Float32Array(cols);
-  for(var fc=0;fc<cols;fc++){ fEdge[fc]=FOREST_TOP - 18*(Math.sin(fc*0.5)*0.5+0.5) - 10*Math.random(); }
-  var trees=[];
-  for(var tt=0;tt<1200;tt++){
-    var tE=(Math.random()*2-1)*(halfW-6);
-    var tN=-36-Math.random()*(south-30);           // from just below the edge down into the wildland
-    trees.push({E:tE,N:tN,r:2.0+Math.random()*2.6,g:66+((Math.random()*58)|0)});
-  }
-  var burning=[], lost=0, fireOn=false, ignited=false, steps=0, frontMax=0, stall=0, colBias=null;
-
-  function resetFire(){
-    state.fill(0); life.fill(0); burning=[]; lost=0; steps=0; fireOn=false; ignited=false; frontMax=0; stall=0;
-    BLD.forEach(function(b){ b.state = b.covered?'cov':(b.north?'safe':'risk'); });
-    document.getElementById('sLost').textContent='0';
-    document.getElementById('sFire').textContent='— ignition pending';
-    document.getElementById('sFire').className='v';
-    updCounts();
-  }
-  function ignite(){
-    resetFire();
-    // persistent per-column bias => the front advances as ragged fingers, not a flat wall
-    colBias=new Float32Array(cols);
-    for(var cb=0;cb<cols;cb++) colBias[cb]=0.65+Math.random()*0.6;
-    // ignition: 3-4 random clustered seed blobs along the south treeline (upwind)
-    var nSeed=3+((Math.random()*2)|0);
-    for(var s=0;s<nSeed;s++){
-      var cc=(cols*(0.18+Math.random()*0.58))|0, rr=1+((Math.random()*3)|0), blob=4+((Math.random()*4)|0);
-      for(var k=0;k<blob;k++){
-        var oc=cc+(((Math.random()*5)|0)-2), or=rr+((Math.random()*3)|0);
-        if(or<0||oc<0||or>=rows||oc>=cols) continue;
-        var idx=or*cols+oc; if(!wet[idx]&&!state[idx]){ state[idx]=1; burning.push(idx); }
-      }
+    // recommended arc wedge, sweeping open from the circle
+    if(aArc>0.01){
+      var sweep = seq(t, 64 + i*0.17, 1.3);
+      var span = lerp(360, tw.arc.span, sweep);
+      var st   = bear(lerp(tw.arc.start - (360-tw.arc.span)/2, tw.arc.start, sweep));
+      g.globalAlpha = aArc*a*dim;
+      g.beginPath(); g.moveTo(tw.x,tw.y);
+      g.arc(tw.x,tw.y,THROW, st, st+span*Math.PI/180); g.closePath();
+      g.fillStyle='rgba(57,210,192,0.22)'; g.fill();
+      g.strokeStyle='rgba(6,16,19,0.55)'; g.lineWidth=5.0*px; g.stroke();
+      g.strokeStyle='rgba(140,255,242,0.98)'; g.lineWidth=2.4*px; g.stroke();
     }
-    fireOn=true; ignited=true;
-    document.getElementById('sFire').textContent='● ACTIVE — front advancing';
-    document.getElementById('sFire').className='v crit';
   }
+  g.globalAlpha=1;
+}
 
-  // wind: from SSW => fire travels NNE (toward +row, slight +col)
-  function fireStep(){
-    if(!fireOn) return;
-    steps++;
-    var next=[];
-    for(var b=0;b<burning.length;b++){
-      var idx=burning[b], cr=(idx/cols)|0, cc=idx%cols;
-      life[idx]++;
-      // spread to neighbours, wind-biased
-      for(var dr=-1;dr<=1;dr++)for(var dc=-1;dc<=1;dc++){
-        if(!dr&&!dc) continue;
-        var nr=cr+dr, nc=cc+dc; if(nr<0||nc<0||nr>=rows||nc>=cols) continue;
-        var ni=nr*cols+nc; if(state[ni]||wet[ni]) continue;
-        // wind-driven: push north, weak lateral creep, no backing south — probabilities
-        // cut ~10x slower, then modulated by per-column bias + noise => organic, fingered front
-        var p; if(dr>0) p=0.34-(dc!==0?0.10:0); else if(dr===0) p=0.04; else p=0;
-        if(dc>0) p+=0.03; // slight east drift (wind SSW)
-        p*= (colBias?colBias[nc]:1);          // persistent fingers
-        p*= 0.8+Math.random()*0.4;            // per-attempt noise => ragged edge
-        if(p>0 && Math.random()<p){ state[ni]=1; next.push(ni); }
-      }
-      if(life[idx]>3){ state[idx]=2; } else { next.push(idx); }
-    }
-    // embers / spot fires downwind (north) — more frequent & scattered, but never cross the wet line
-    if(steps%2===0){
-      var nE=1+((Math.random()*2)|0);
-      for(var e=0;e<nE;e++){
-        var src=burning[(Math.random()*burning.length)|0]; if(src==null) continue;
-        var sr=(src/cols)|0, sc=src%cols, jr=sr+2+((Math.random()*4)|0), jc=sc+(((Math.random()*5)|0)-2);
-        if(jr<rows&&jc>=0&&jc<cols){ var blocked=false; for(var yy=sr;yy<=jr;yy++){ if(wet[yy*cols+jc]){blocked=true;break;} }
-          var ji=jr*cols+jc; if(!blocked&&!state[ji]&&!wet[ji]){ state[ji]=1; next.push(ji); } }
-      }
-    }
-    burning=next;
-    // convergence: once the front stops gaining ground (held at the wet line), let remnants burn out
-    var mr=0; for(var q=0;q<burning.length;q++){ var qr=(burning[q]/cols)|0; if(qr>mr)mr=qr; }
-    if(mr>frontMax){ frontMax=mr; stall=0; } else { stall++; }
-    if(stall>20){ burning.length=0; }
-    // structure damage: any building whose centroid cell is burning/burnt and not covered
-    for(var k=0;k<BLD.length;k++){ var bl=BLD[k]; if(bl.state==='lost'||bl.state==='cov') continue;
-      var gr=Math.floor((bl.c[0]-originLL[0])*111320/CELL), gc=Math.floor((bl.c[1]-originLL[1])*111320*COSLAT/CELL);
-      if(gr>=0&&gc>=0&&gr<rows&&gc<cols){ var s=state[gr*cols+gc]; if(s){ bl.state='lost'; lost++; } }
-    }
-    if(burning.length===0){ fireOn=false;
-      document.getElementById('sFire').textContent='✓ CONTAINED at wet line';
-      document.getElementById('sFire').className='v ok';
-    }
-    document.getElementById('sLost').textContent=lost;
-    updCounts();
-  }
-  function updCounts(){
-    var cov=0,safe=0; for(var k=0;k<BLD.length;k++){ var s=BLD[k].state; if(s==='cov')cov++; else if(s==='safe')safe++; }
-    document.getElementById('sCov').textContent=cov;
-    document.getElementById('sSafe').textContent=safe+cov; // protected = behind line + covered
-  }
+// duty cycle: two of ten firing, rotating — drawn into the persistent wet layer
+var firedUpTo = -1;
+function drawDuty(g, t, cam){
+  var a = track(t,[[72.4,0],[74.5,1],[79.5,1],[81.5,0]]);
+  if(a<=0.01) return;
+  var px = 1/cam.s;
+  var slot = Math.floor((t-72.4)/1.15);
+  var active = [ (slot*2)%10, (slot*2+1)%10 ];
 
-  // ---------- canvas render ----------
-  var cv=document.getElementById('fx'), ctx=cv.getContext('2d');
-  function size(){ var s=map.getSize(); cv.width=s.x; cv.height=s.y; }
-  size(); map.on('resize',size);
-  function P(ll){ return map.latLngToContainerPoint(ll); }
-  function draw(){
-    ctx.clearRect(0,0,cv.width,cv.height);
-    var cpx=Math.max(2, P(cellLL(0,1)).x - P(cellLL(0,0)).x + 1);
-    // ---- forest / wildland fuel + interface buffer (under everything) ----
-    var WF=function(E,N){ return P(offM(FRONT,E,N)); };
-    var fstep=2*halfW/cols;
-    // cleared defensible buffer strip: frontage (wet line) down to the ragged canopy edge
-    ctx.beginPath();
-    var pbA=WF(-halfW,10); ctx.moveTo(pbA.x,pbA.y);
-    var pbB=WF(halfW,10);  ctx.lineTo(pbB.x,pbB.y);
-    for(var fb=cols-1;fb>=0;fb--){ var pe=WF(-halfW+fb*fstep,fEdge[fb]); ctx.lineTo(pe.x,pe.y); }
-    ctx.closePath(); ctx.fillStyle='rgba(150,138,92,0.13)'; ctx.fill();
-    // forest canopy base fill: ragged top edge -> south edge of the grid
-    ctx.beginPath();
-    for(var fc2=0;fc2<cols;fc2++){ var pf=WF(-halfW+fc2*fstep,fEdge[fc2]); if(fc2===0)ctx.moveTo(pf.x,pf.y); else ctx.lineTo(pf.x,pf.y); }
-    var pbr=WF(halfW,-south-30), pbl=WF(-halfW,-south-30);
-    ctx.lineTo(pbr.x,pbr.y); ctx.lineTo(pbl.x,pbl.y); ctx.closePath();
-    ctx.fillStyle='rgba(16,40,24,0.62)'; ctx.fill();
-    // tree canopy stipple (drawn before burned/fire layers, which paint over the scorched zone)
-    var trad=Math.max(1.5,cpx*0.42);
-    for(var ti2=0;ti2<trees.length;ti2++){ var T=trees[ti2]; var tp=WF(T.E,T.N);
-      if(tp.x<-20||tp.x>cv.width+20||tp.y<-20||tp.y>cv.height+20) continue;
-      ctx.beginPath(); ctx.arc(tp.x,tp.y,trad,0,7);
-      ctx.fillStyle='rgba('+((T.g*0.34)|0)+','+T.g+','+((T.g*0.5)|0)+',0.6)'; ctx.fill(); }
-    // burned area
-    ctx.globalAlpha=1;
-    for(var i=0;i<state.length;i++){ if(state[i]===2){ var p=P(cellLL((i/cols)|0,i%cols)); ctx.fillStyle='rgba(40,26,18,0.82)'; ctx.fillRect(p.x-cpx/2,p.y-cpx/2,cpx,cpx); } }
-    // wetted corridor
-    ctx.fillStyle='rgba(88,166,255,0.32)';
-    for(var w=0;w<wet.length;w++){ if(wet[w]){ var pw=P(cellLL((w/cols)|0,w%cols)); ctx.fillRect(pw.x-cpx/2,pw.y-cpx/2,cpx,cpx); } }
-    // buildings — high contrast over the dimmed satellite
-    for(var k=0;k<BLD.length;k++){ var b=BLD[k], ring=b.r; if(ring.length<3) continue;
-      ctx.beginPath(); for(var j=0;j<ring.length;j++){ var pp=P(ring[j]); if(j===0)ctx.moveTo(pp.x,pp.y); else ctx.lineTo(pp.x,pp.y); } ctx.closePath();
-      if(b.state==='cov'){ ctx.fillStyle='rgba(57,210,192,0.60)'; ctx.strokeStyle='#5af0e0'; }
-      else if(b.state==='lost'){ ctx.fillStyle='rgba(10,10,10,0.92)'; ctx.strokeStyle='#000'; }
-      else if(b.state==='safe'){ ctx.fillStyle='rgba(63,185,80,0.40)'; ctx.strokeStyle='rgba(88,255,110,0.95)'; }
-      else { ctx.fillStyle='rgba(210,153,34,0.42)'; ctx.strokeStyle='rgba(255,190,60,0.95)'; }
-      ctx.lineWidth=1.5; ctx.fill(); ctx.stroke();
-    }
-    // active gun coverage rings (sequential highlight) + all guns — bolder for legibility
-    guns.forEach(function(g,gi){
-      var p=P(g.ll); var rPx=(P(offM(g.ll,SPEC.cover,0)).x - p.x);
-      var act=(g.bank===activeBank);
-      ctx.beginPath(); ctx.arc(p.x,p.y,Math.abs(rPx),0,7);
-      ctx.fillStyle=act?'rgba(248,81,73,0.22)':'rgba(219,109,40,0.12)';
-      ctx.strokeStyle=act?'rgba(255,90,80,1)':'rgba(245,150,60,0.85)'; ctx.lineWidth=act?2.5:1.6; ctx.fill(); ctx.stroke();
-      g.dot.setStyle({fillColor:act?'#f85149':'#3fb950',radius:act?8:6});
+  // bank into the accumulating wet layer, in site coordinates
+  if(slot>firedUpTo && slot>=0){
+    firedUpTo = slot;
+    wctx.setTransform(WET_K,0,0,WET_K,0,0);
+    active.forEach(function(idx){
+      var tw=TW[idx], st=bear(tw.arc.start);
+      wctx.beginPath(); wctx.moveTo(tw.x,tw.y);
+      wctx.arc(tw.x,tw.y,THROW, st, st+tw.arc.span*Math.PI/180); wctx.closePath();
+      wctx.fillStyle='rgba(88,166,255,0.17)'; wctx.fill();
     });
-    // burning front (bright, on top)
-    for(var f=0;f<state.length;f++){ if(state[f]===1){ var pf=P(cellLL((f/cols)|0,f%cols));
-      ctx.fillStyle='rgba(248,120,40,0.95)'; ctx.fillRect(pf.x-cpx/2,pf.y-cpx/2,cpx,cpx);
-      ctx.fillStyle='rgba(255,220,120,0.5)'; ctx.fillRect(pf.x-cpx/4,pf.y-cpx/4,cpx/2,cpx/2); } }
   }
 
-  // ---------- sequencer + loops ----------
-  // 8 sprinklers/trailer split into two interleaved banks of 4; the active bank toggles so
-  // exactly 4 of each trailer's 8 fire at a time (8 active across the whole frontage).
-  var seqMs=3000, last=Date.now(), tank=64, activeBank=0;
-  function firingIds(ti){ return guns.filter(function(g){return g.trailer===ti && g.bank===activeBank;}).map(function(g){return g.id;}).join(' '); }
-  document.getElementById('sA').textContent=firingIds(0);
-  document.getElementById('sB').textContent=firingIds(1);
-  function tickUI(){
-    var now=Date.now();
-    if(now-last>=seqMs){ last=now; activeBank^=1;
-      document.getElementById('sA').textContent=firingIds(0); document.getElementById('sB').textContent=firingIds(1); }
-    document.getElementById('sPsi').textContent=(70+Math.sin(now/900)*1.4).toFixed(0);
-    document.getElementById('sFlow').textContent=Math.round(380+Math.sin(now/1100)*40);
-    if(fireOn) tank=Math.max(8,tank-0.02);
-    document.getElementById('sTank').textContent=tank.toFixed(0);
-  }
-  setInterval(tickUI,250);
-  setInterval(fireStep,800);   // ~10x slower burn (paired with the reduced spread probabilities)
-  var lastDraw=0;
-  function frame(t){ if(t-lastDraw>40){ draw(); lastDraw=t; } requestAnimationFrame(frame); }
-
-  map.whenReady(function(){
-    var b=L.latLngBounds([ offM(FRONT,-halfW+30,-south+10), offM(FRONT,halfW-30,430) ]);
-    map.fitBounds(b,{padding:[30,30]});
-    updCounts(); requestAnimationFrame(frame);
+  active.forEach(function(idx){
+    var tw=TW[idx], st=bear(tw.arc.start);
+    var pulse = 0.55+0.45*Math.sin(t*5.5);
+    g.globalAlpha = a*(0.45+0.35*pulse);
+    g.beginPath(); g.moveTo(tw.x,tw.y);
+    g.arc(tw.x,tw.y,THROW, st, st+tw.arc.span*Math.PI/180); g.closePath();
+    g.fillStyle='rgba(88,166,255,0.33)'; g.fill();
+    g.strokeStyle='rgba(160,220,255,0.95)'; g.lineWidth=2.4*px; g.stroke();
+    g.globalAlpha = a;
+    g.beginPath(); g.arc(tw.x,tw.y, 4.5*px*2.4, 0, Math.PI*2);
+    g.fillStyle='#f85149'; g.fill();
   });
-  document.getElementById('igniteBtn').onclick=ignite;
-  document.getElementById('resetBtn').onclick=resetFire;
+  g.globalAlpha=1;
+}
 
-  // ?auto=1 -> self-playing loop (used by the deck embed): ignite, hold the line, reset, repeat
-  if(new URLSearchParams(location.search).has('auto')){
-    var loop=function(){ ignite(); var w=setInterval(function(){ if(!fireOn){ clearInterval(w); setTimeout(loop,6000); } },500); };
-    setTimeout(loop,2600);
+function drawTowers(g, t, cam){
+  var px = 1/cam.s;
+  var rankOn = track(t,[[53.5,0],[56,1],[63,1],[65.5,0]]);
+  var shed   = track(t,[[54.5,10],[59,6],[62.5,6],[64,10]]);
+  for(var i=0;i<TW.length;i++){
+    var tw=TW[i], a=towerAlpha(t,i);
+    if(a<=0.01) continue;
+    var isShed = tw.rank > Math.round(shed);
+    var dim = isShed ? lerp(1,0.3,rankOn) : 1;
+    var pop = seq(t, 34.2+i*0.42, 0.6);
+
+    g.globalAlpha = a*dim;
+    // drop ring
+    if(pop<1){
+      g.beginPath(); g.arc(tw.x,tw.y, lerp(26,7,pop)*px*2.2, 0, Math.PI*2);
+      g.strokeStyle='rgba(57,210,192,'+(1-pop)+')'; g.lineWidth=2*px; g.stroke();
+    }
+    g.beginPath(); g.arc(tw.x, tw.y, 6.2*px*1.6, 0, Math.PI*2);
+    g.fillStyle = isShed && rankOn>0.5 ? '#f85149' : '#39d2c0';
+    g.strokeStyle='#0b1013'; g.lineWidth=1.6*px; g.fill(); g.stroke();
+
+    // label: T-id, and its rank once ranking is on screen
+    var lx = tw.x + 11*px*1.6, ly = tw.y - 9*px*1.6;
+    g.font = (13*px*1.6)+'px "JetBrains Mono", monospace';
+    g.textBaseline='middle';
+    g.lineWidth = 3.2*px; g.strokeStyle='rgba(6,10,13,0.92)';
+    var lbl = 'T'+tw.id + (rankOn>0.35 ? '  #'+tw.rank : '');
+    g.strokeText(lbl, lx, ly);
+    g.fillStyle = isShed && rankOn>0.5 ? '#f85149' : '#cfe9e6';
+    g.fillText(lbl, lx, ly);
   }
+  g.globalAlpha=1;
+}
+
+// embers drifting in from the wildland side, very quiet
+var EMB=[]; for(var e=0;e<70;e++) EMB.push({ x:Math.random()*260-40, y:Math.random()*SH, v:6+Math.random()*16, r:Math.random()*1.6+0.5, p:Math.random() });
+function drawEmbers(g, t, cam){
+  var a = track(t,[[70,0],[74,0.75],[79.5,0.75],[81.5,0]]);
+  if(a<=0.01 || REDUCED) return;
+  var px = 1/cam.s;
+  for(var i=0;i<EMB.length;i++){
+    var m=EMB[i];
+    var x = m.x + ((t*m.v) % 300);
+    var y = m.y + Math.sin(t*0.9+m.p*9)*7;
+    g.globalAlpha = a*(0.25+0.5*Math.abs(Math.sin(t*2+m.p*7)));
+    g.beginPath(); g.arc(x, y, m.r*px*2.2, 0, Math.PI*2);
+    g.fillStyle='#ffb067'; g.fill();
+  }
+  g.globalAlpha=1;
+}
+
+/* --------------------------------------------------------------- render */
+var t0 = performance.now()/1000, prevLoopN = 0;
+
+var paused = false;
+function frame(){
+  requestAnimationFrame(frame);
+  if(document.hidden || paused) return;
+  var abs = performance.now()/1000 - t0;
+  render(abs % LOOP, Math.floor(abs/LOOP));
+}
+
+function render(t, loopN){
+  if(!W || cv.clientWidth!==W || cv.clientHeight!==H) resize();
+  if(ready<2) return;
+
+  if(loopN!==prevLoopN){                       // seamless restart
+    prevLoopN = loopN; firedUpTo = -1; barsFilled = false; ledgerFilled = false;
+    clearWet();
+    clsBars.forEach(function(b){ b.el.style.width='0%'; });
+    ledRows.forEach(function(r){ r.sBar.style.width='0%'; r.wBar.style.width='0%'; });
+  }
+
+  var cam = camera(t);
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle='#080b0e'; ctx.fillRect(0,0,cv.width,cv.height);
+  applyCam(cam, ctx);
+
+  // imagery, always on; the block-out wipes in over it
+  drawImageLayer(ctx, imgOrtho, track(t,[[0,0],[1.6,1],[80.5,1],[LOOP,0]]));
+
+  var blkA = track(t,[[20.6,0],[23,0.82],[30,0.78],[34,0.42],[44,0.30],[79,0.26],[81.5,0]]);
+  if(blkA>0.002){
+    var wipe = seq(t, 20.6, 2.6);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, SW*wipe, SH); ctx.clip();
+    drawImageLayer(ctx, imgBlk, blkA);
+    // leading edge of the wipe
+    if(wipe<1 && wipe>0){
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle='#39d2c0'; ctx.lineWidth=2.4/cam.s;
+      ctx.beginPath(); ctx.moveTo(SW*wipe,0); ctx.lineTo(SW*wipe,SH); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  drawVectors(ctx, t, cam);
+  drawFireLine(ctx, t, cam);
+  drawCoverage(ctx, t, cam);
+
+  // the accumulated wet line sits under the live arcs, anchored to the site
+  ctx.globalAlpha = track(t,[[72.4,0],[74.5,1],[79.5,1],[81.5,0]]);
+  ctx.drawImage(wet, 0, 0, SW, SH);
+  ctx.globalAlpha = 1;
+
+  drawDuty(ctx, t, cam);
+  drawTowers(ctx, t, cam);
+  drawEmbers(ctx, t, cam);
+
+  // vignette so the overlay type always has something to sit on
+  ctx.setTransform(1,0,0,1,0,0);
+  var gr = ctx.createLinearGradient(0, cv.height*0.42, 0, cv.height);
+  gr.addColorStop(0,'rgba(6,9,12,0)'); gr.addColorStop(0.55,'rgba(6,9,12,0.55)'); gr.addColorStop(1,'rgba(6,9,12,0.92)');
+  ctx.fillStyle=gr; ctx.fillRect(0, cv.height*0.42, cv.width, cv.height*0.58);
+  var gt = ctx.createLinearGradient(0,0,0,cv.height*0.26);
+  gt.addColorStop(0,'rgba(6,9,12,0.86)'); gt.addColorStop(1,'rgba(6,9,12,0)');
+  ctx.fillStyle=gt; ctx.fillRect(0,0,cv.width,cv.height*0.26);
+  // a touch of corner falloff so the right-hand readouts always have a base
+  var gs = ctx.createLinearGradient(cv.width*0.66,0,cv.width,0);
+  gs.addColorStop(0,'rgba(6,9,12,0)'); gs.addColorStop(1,'rgba(6,9,12,0.55)');
+  ctx.fillStyle=gs; ctx.fillRect(cv.width*0.66,0,cv.width*0.34,cv.height);
+
+  /* ---- overlay state ---- */
+  var si = 0;
+  for(var i=0;i<SCENES.length;i++) if(t>=SCENES[i].t) si=i;
+  setScene(si);
+
+  els.g1.classList.toggle('on', t>1.2 && t<80.5);
+  els.g2.classList.toggle('on', t>10 && t<80.5);
+  els.g3.classList.toggle('on', t>43.4 && t<80.5);
+
+  var nb = Math.round(BLD.length*clamp(seq(t,10,3.4)*1.05,0,1));
+  els.n2.textContent = nb ? nb.toLocaleString() : '0';
+
+  if(t>66.5){
+    // the punchline of the arc beat: mean wasted share, full circle vs recommended arc
+    var wNow = Math.round(lerp(MEAN_WASTE_FULL, MEAN_WASTE_ARC, seq(t,66.5,2.0))*100);
+    els.l3.textContent = 'Wasted share · circle → arc';
+    els.n3.innerHTML = Math.round(MEAN_WASTE_FULL*100)+'% <u>&rarr;</u> '+wNow+'%';
+  } else {
+    els.l3.textContent = 'Structure under cover';
+    els.n3.innerHTML = Math.round(TOTAL_COV_M2*seq(t,43.4,2.2)).toLocaleString()+' <u>m&sup2;</u>';
+  }
+
+  var clsOn = t>21 && t<80.5;
+  els.cls.classList.toggle('on', clsOn);
+  if(clsOn && !barsFilled){ barsFilled = true; clsBars.forEach(function(b){ b.el.style.width = b.pct+'%'; }); }
+
+  var ledOn = t>53.6 && t<80.5;
+  els.led.classList.toggle('on', ledOn);
+  els.ledlbl.textContent = t>63.5 ? 'Tower ledger · arc window' : 'Tower ledger · structure / waste';
+  if(ledOn && !ledgerFilled){
+    ledgerFilled = true;
+    ledRows.forEach(function(r){
+      r.sBar.style.width = Math.round(72*(r.t.structure_m2/MAX_STRUCT))+'%';
+      r.wBar.style.width = Math.round(28*(r.t.waste/0.4))+'%';
+    });
+  }
+  if(ledOn){
+    var shedN = Math.round(track(t,[[54.5,10],[59,6],[62.5,6],[64,10]]));
+    ledRows.forEach(function(r){ r.el.classList.toggle('shed', r.t.rank>shedN); });
+    if(t>65.5){
+      ledRows.forEach(function(r){ r.wBar.style.width = Math.round(28*(r.t.wasteArc/0.4))+'%'; });
+    }
+  }
+
+  els.prog.style.width = (t/LOOP*100).toFixed(2)+'%';
+}
+
+// jump to / draw a single point in the loop — used when checking the film, inert in the deck
+function reset(){
+  prevLoopN = 0; firedUpTo = -1; lastScene = -1; barsFilled = false; ledgerFilled = false;
+  clearWet();
+  clsBars.forEach(function(b){ b.el.style.width='0%'; });
+  ledRows.forEach(function(r){ r.sBar.style.width='0%'; r.wBar.style.width='0%'; });
+}
+window.__moat = {
+  loop: LOOP,
+  scenes: SCENES.map(function(s){ return s.t; }),
+  seek: function(s){ t0 = performance.now()/1000 - s; reset(); },
+  // draw one frame at time s without the rAF clock (for stills)
+  play: function(){ paused=false; },
+  step: function(s){
+    paused = true;
+    document.documentElement.classList.add('nofx');
+    reset(); lastScene = -2;
+    render(s, 0);
+    var si=0; for(var i=0;i<SCENES.length;i++) if(s>=SCENES[i].t) si=i;
+    var sc=SCENES[si];
+    els.step.innerHTML=sc.step; els.head.innerHTML=sc.head; els.body.innerHTML=sc.body;
+    [els.stepBox, els.head, els.body].forEach(function(e){ e.classList.add('on'); });
+    if(s>21) clsBars.forEach(function(b){ b.el.style.width=b.pct+'%'; });
+    if(s>53.6) ledRows.forEach(function(r){
+      r.sBar.style.width = Math.round(72*(r.t.structure_m2/MAX_STRUCT))+'%';
+      r.wBar.style.width = Math.round(28*((s>65.5?r.t.wasteArc:r.t.waste)/0.4))+'%';
+    });
+    return s;
+  }
+};
+
+resize();
+requestAnimationFrame(frame);
 })();
 </script>
 </body>
