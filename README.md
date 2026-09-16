@@ -29,8 +29,8 @@ and pans west onto the line as the threat appears.
 
 ## How the placement is decided
 
-Not hand-drawn. `scripts/` in the commit history has the solver; the result is
-baked into `site.js`. The rules, in order:
+Not hand-drawn. `scripts/solve-placement.js` reads the block-out PNG and the
+road network and writes the result into `site.js`. The rules, in order:
 
 1. **The threat sets the geometry.** Fire out of the west means the line goes
    between the wildland and the town.
