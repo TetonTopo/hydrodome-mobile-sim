@@ -77,6 +77,10 @@
   .prog{position:absolute;left:0;right:0;bottom:0;height:2px;background:#ffffff12}
   .prog i{display:block;height:100%;background:linear-gradient(90deg,#39d2c0,#db6d28);width:0}
 
+  /* ?chrome=0 — the deck supplies its own title and footer */
+  html.nochrome .brand, html.nochrome .foot{display:none}
+  html.nochrome .rail{top:26px}
+
   @media (max-width:900px){
     .brand .wd{font-size:20px;letter-spacing:5px}
     .cap h1{font-size:27px}.cap p{font-size:15px}.cap{max-width:64%}
@@ -136,6 +140,8 @@ var S = window.SITE;
 var SW = S.site.width_m, SH = S.site.height_m;
 var THROW = S.throw;                       // 50 m
 var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// embedded in the deck, the slide carries the title — drop our own lockup
+if(/[?&]chrome=0/.test(location.search)) document.documentElement.classList.add('nochrome');
 
 /* ---------------------------------------------------------------- utils */
 function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
