@@ -1,4 +1,4 @@
-# HydroDome — Mobile Deployment Simulator
+# The Moat (formerly HydroDome Mobile) — Deployment Simulator
 
 A browser-based deployment/coverage simulator for the HydroDome **mobile
 (trailer-deployed)** wildfire-defense system, by
@@ -50,4 +50,4 @@ drives the firing sequencer and telemetry. No build step.
 - [`hydrodome-sim`](https://github.com/TetonTopo/hydrodome-sim) — archived permanent-system sims.
 
 ---
-HYDRODOME™ Mobile · by Carmanah Wildfire
+THE MOAT™ · by Carmanah Wildfire

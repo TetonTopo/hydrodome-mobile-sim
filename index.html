@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>HydroDome Mobile — Deployment Simulator (Penticton)</title>
+<title>The Moat — Deployment Simulator (Penticton)</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -93,11 +93,11 @@
 
 <div class="legend">
   <div><span class="sw" style="background:rgba(16,40,24,.85)"></span>Forest / wildland fuel&nbsp; <span class="sw" style="background:rgba(150,138,92,.4)"></span>Defensible buffer</div>
-  <div><span class="sw" style="background:rgba(57,210,192,.35);border:1px solid #39d2c0"></span>Structure under HydroDome cover</div>
+  <div><span class="sw" style="background:rgba(57,210,192,.35);border:1px solid #39d2c0"></span>Structure under Moat cover</div>
   <div><span class="sw" style="background:rgba(88,166,255,.45)"></span>Wetted frontage / wet line (~55 m)</div>
   <div><span class="sw" style="background:#f85149"></span>Active fire front &nbsp;<span class="sw" style="background:#3a2218"></span>Burned</div>
 </div>
-<div class="foot">HYDRODOME™ MOBILE · CARMANAH WILDFIRE</div>
+<div class="foot">THE MOAT™ · CARMANAH WILDFIRE</div>
 
 <script src="buildings.js"></script>
 <script>
@@ -105,7 +105,7 @@
   var SITE=[49.4902,-119.5892];
   var map=L.map('map',{center:SITE,zoom:16,zoomControl:true,attributionControl:true,preferCanvas:true});
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    {maxZoom:19, opacity:0.5, attribution:'Imagery © Esri, Maxar · HydroDome'}).addTo(map);
+    {maxZoom:19, opacity:0.5, attribution:'Imagery © Esri, Maxar · The Moat'}).addTo(map);
 
   // ---------- geometry helpers ----------
   var COSLAT=Math.cos(SITE[0]*Math.PI/180);
